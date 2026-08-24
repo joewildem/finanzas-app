@@ -1,20 +1,29 @@
 import { useState } from 'react'
 import { Wallet01Icon } from '@hugeicons/core-free-icons'
-import { Link } from 'react-router-dom'
 
-import { AccountCardTile } from '@/components/accounts/account-card-tile'
 import { AccountFormDialog } from '@/components/accounts/account-form-dialog'
+import { AccountListItem } from '@/components/accounts/account-list-item'
 import { EmptyState } from '@/components/empty-state'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { useAccounts } from '@/hooks/use-accounts'
+import { ACCOUNT_TYPE_LABELS, type AccountType } from '@/lib/accounts'
 
-// CU-002 — listado de cuentas, activas por defecto con toggle para incluir archivadas.
+const ACCOUNT_TYPE_ORDER: AccountType[] = ['debito', 'credito', 'efectivo']
+
+// CU-002 — listado de cuentas, activas por defecto con toggle para incluir archivadas. Agrupado
+// por tipo (Debit/Credit/Cash) como una lista compacta en vez de la card bancaria completa — esa
+// vista se sentía muy apretada una vez que Accounts se movió a Settings (ancho reducido).
 export function AccountsListPage() {
   const [includeArchived, setIncludeArchived] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const { accounts, refetch } = useAccounts(includeArchived)
+
+  const groupedAccounts = ACCOUNT_TYPE_ORDER.map((tipo) => ({
+    tipo,
+    accounts: (accounts ?? []).filter((account) => account.tipo === tipo),
+  })).filter((group) => group.accounts.length > 0)
 
   return (
     <div className="flex flex-col gap-6">
@@ -45,15 +54,20 @@ export function AccountsListPage() {
         </Card>
       )}
 
-      {accounts && accounts.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {accounts.map((account) => (
-            <Link key={account.id} to={`/settings/accounts/${account.id}`}>
-              <AccountCardTile account={account} />
-            </Link>
-          ))}
-        </div>
-      )}
+      {groupedAccounts.map(({ tipo, accounts: accountsInGroup }) => (
+        <Card key={tipo}>
+          <CardHeader>
+            <CardTitle>{ACCOUNT_TYPE_LABELS[tipo]}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col divide-y divide-border">
+              {accountsInGroup.map((account) => (
+                <AccountListItem key={account.id} account={account} />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
 
       <AccountFormDialog
         mode="create"
