@@ -40,6 +40,8 @@ son los campos que importan:
 - En Supabase (Authentication → URL Configuration) agregar ese subdominio a **Site URL** /
   **Redirect URLs**, o el login con Google fallará después del deploy.
 
-`public/_redirects` queda en el repo mas no aplica a este flujo (es una convención específica de
-Cloudflare Pages clásico, no de Workers) — se puede ignorar mientras el deploy sea vía Workers.
+**No agregar un archivo `public/_redirects`**: a diferencia de Cloudflare Pages clásico, el deploy
+de Workers sí lo lee, y su regla `/* /index.html 200` entra en conflicto con el propio
+`not_found_handling` de Workers (ambos reescriben a `index.html`) — Cloudflare lo rechaza como loop
+de redirección infinito y el deploy falla.
 
