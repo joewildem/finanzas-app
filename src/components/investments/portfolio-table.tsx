@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCurrency } from '@/lib/accounts'
 import type { Investment, InvestmentStatus } from '@/lib/investments'
-import { cn } from '@/lib/utils'
+import { cn, formatPercent as formatPercentValue } from '@/lib/utils'
 
 export interface PortfolioTableRow {
   investment: Investment
@@ -20,7 +20,7 @@ export interface PortfolioTableRow {
 }
 
 function formatPercent(value: number | undefined): string {
-  return value === undefined ? '—' : `${value.toFixed(2)}%`
+  return value === undefined ? '—' : formatPercentValue(value)
 }
 
 // CU-050 (lectura) / CU-052 (edición en lote) — un solo componente para ambas tablas del
@@ -131,7 +131,7 @@ export function PortfolioTable({
                     ) : variant === 'active' ? (
                       <>
                         <TableCell className="text-right font-mono">
-                          {row.investment.porcentaje_objetivo.toFixed(2)}%
+                          {formatPercent(row.investment.porcentaje_objetivo)}
                         </TableCell>
                         <TableCell className="text-right font-mono">{formatCurrency(row.investment.balance_actual)}</TableCell>
                         <TableCell className="text-right font-mono">{formatPercent(row.porcentajeActual)}</TableCell>
@@ -225,7 +225,7 @@ export function PortfolioTable({
                       <div>
                         <p className="text-xs text-muted-foreground">Target / Balance</p>
                         <p className="font-mono text-card-foreground">
-                          {row.investment.porcentaje_objetivo.toFixed(2)}% · {formatCurrency(row.investment.balance_actual)}
+                          {formatPercent(row.investment.porcentaje_objetivo)} · {formatCurrency(row.investment.balance_actual)}
                         </p>
                       </div>
                       <div>

@@ -22,6 +22,7 @@ import {
   DEBT_TYPE_LABELS,
 } from '@/lib/debts'
 import { supabase } from '@/lib/supabase'
+import { formatPercent } from '@/lib/utils'
 
 // CU-057 — mismo layout que SavingsGoalDetailPage: header (ícono por tipo + nombre + badges +
 // Edit/Archive), card de stats con GoalProgressRing (reutilizado, % pagado), card de historial de
@@ -99,7 +100,7 @@ export function DebtDetailPage() {
         </CardHeader>
         <CardContent className="flex items-center gap-6">
           <GoalProgressRing percent={percent} size={88} strokeWidth={7}>
-            <span className="text-sm font-medium text-card-foreground">{Math.round(percent * 100)}%</span>
+            <span className="text-sm font-medium text-card-foreground">{formatPercent(percent * 100)}</span>
           </GoalProgressRing>
           <div className="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-4">
             <div>

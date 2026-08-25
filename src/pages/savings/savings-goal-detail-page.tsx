@@ -21,6 +21,7 @@ import {
 } from '@/lib/savings-goals'
 import { supabase } from '@/lib/supabase'
 import { TRANSACTION_TYPE_LABELS } from '@/lib/transactions'
+import { formatPercent } from '@/lib/utils'
 
 // CU-044 — mismo layout que AccountDetailPage: header (emoji + nombre + badges + Edit/Archive),
 // card de stats con GoalProgressRing, card de historial de movimientos (lista simple, sin
@@ -107,7 +108,7 @@ export function SavingsGoalDetailPage() {
         </CardHeader>
         <CardContent className="flex items-center gap-6">
           <GoalProgressRing percent={percent} size={88} strokeWidth={7}>
-            <span className="text-sm font-medium text-card-foreground">{Math.round(percent * 100)}%</span>
+            <span className="text-sm font-medium text-card-foreground">{formatPercent(percent * 100)}</span>
           </GoalProgressRing>
           <div className="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-4">
             <div>

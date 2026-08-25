@@ -25,6 +25,7 @@ import {
   type Debt,
 } from '@/lib/debts'
 import { supabase } from '@/lib/supabase'
+import { formatPercent } from '@/lib/utils'
 
 // CU-056 — card de listado, mismo layout que SavingsGoalCard: header (ícono por tipo + nombre +
 // menú de acciones), pill de fecha estimada de liquidación, fila principal (saldo + "from
@@ -113,7 +114,7 @@ export function DebtCard({
             <p className="text-xs text-muted-foreground">from {formatCurrency(debt.monto_original)}</p>
           </div>
           <GoalProgressRing percent={percent} size={64} strokeWidth={6}>
-            <span className="text-sm font-medium text-card-foreground">{Math.round(percent * 100)}%</span>
+            <span className="text-sm font-medium text-card-foreground">{formatPercent(percent * 100)}</span>
           </GoalProgressRing>
         </div>
 

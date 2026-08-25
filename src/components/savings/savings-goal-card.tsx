@@ -27,6 +27,7 @@ import {
 } from '@/lib/savings-goals'
 import { supabase } from '@/lib/supabase'
 import type { Transaction } from '@/lib/transactions'
+import { formatPercent } from '@/lib/utils'
 
 // CU-043 — card de listado, estructura alineada a la referencia de diseño: header (emoji + nombre
 // + menú de acciones), pill de fecha límite, fila principal (aportado + "from {objetivo}" a la
@@ -126,7 +127,7 @@ export function SavingsGoalCard({
             <p className="text-xs text-muted-foreground">from {formatCurrency(goal.monto_objetivo)}</p>
           </div>
           <GoalProgressRing percent={percent} size={64} strokeWidth={6}>
-            <span className="text-sm font-medium text-card-foreground">{Math.round(percent * 100)}%</span>
+            <span className="text-sm font-medium text-card-foreground">{formatPercent(percent * 100)}</span>
           </GoalProgressRing>
         </div>
 

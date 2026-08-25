@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils'
+import { cn, formatPercent } from '@/lib/utils'
 
 // CU-052, paso 4 del flujo — mientras el usuario edita, el sistema recalcula en pantalla la suma de
 // los porcentajes objetivo del conjunto activo resultante (RN-159: debe cerrar en exactamente 100%,
@@ -16,10 +16,10 @@ export function PortfolioConfigBar({ sumActivePercent }: { sumActivePercent: num
     >
       <span className="text-muted-foreground">Active instruments target allocation</span>
       <span className={cn('font-mono font-medium', isValid ? 'text-foreground' : 'text-destructive')}>
-        {sumActivePercent.toFixed(2)}%
+        {formatPercent(sumActivePercent)}
         {!isValid && sumActivePercent !== 0 && (
           <span className="ml-2 font-sans font-normal">
-            ({diff > 0 ? `${diff.toFixed(2)}% short of 100%` : `${Math.abs(diff).toFixed(2)}% over 100%`})
+            ({diff > 0 ? `${formatPercent(diff)} short of 100%` : `${formatPercent(Math.abs(diff))} over 100%`})
           </span>
         )}
       </span>
