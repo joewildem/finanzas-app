@@ -100,15 +100,19 @@ de `tipo = gasto` igual que cualquier otra.
 - RN-038: El usuario siempre captura el monto en positivo; el sistema aplica el signo
   internamente al persistir (`gasto` → negativo, `ingreso` → positivo) y al afectar `saldo_actual`.
 - RN-039: Si `tipo = gasto`, `category_id` debe referenciar una categoría cuyo grupo tenga
-  `flujo = outflow`. Si `tipo = ingreso`, `category_id` debe referenciar exclusivamente una
-  categoría cuyo grupo tenga `flujo = inflow` (campo `flujo` de `categories`, ver RN-118 en
-  [[categorias]]). *Revisado 2026-08-11: hasta entonces el grupo permitido se identificaba por
-  nombre exacto (Bills/Needs/Wants/Investment para gasto, Income para ingreso) — un grupo renombrado
-  quedaba sin categorías válidas para su tipo de movimiento. El campo `flujo` reemplaza esa
-  comparación por nombre; el resultado de la regla no cambia para el catálogo semilla actual. El
+  `flujo = outflow` **o** `flujo = investment`. Si `tipo = ingreso`, `category_id` debe referenciar
+  exclusivamente una categoría cuyo grupo tenga `flujo = inflow` (campo `flujo` de `categories`, ver
+  RN-118 en [[categorias]]). *Revisado 2026-08-11: hasta entonces el grupo permitido se identificaba
+  por nombre exacto (Bills/Needs/Wants/Investment para gasto, Income para ingreso) — un grupo
+  renombrado quedaba sin categorías válidas para su tipo de movimiento. El campo `flujo` reemplaza
+  esa comparación por nombre; el resultado de la regla no cambia para el catálogo semilla actual. El
   chip "Investment" del formulario sigue acotando el selector de categoría a ese grupo específico
   por nombre — es un subconjunto de Outflow, no una tercera opción de flujo, y queda fuera de este
-  cambio.*
+  cambio.* **Revisado 2026-08-28** (al alinear Analytics de [[dashboard]]): `investment` pasa a ser
+  la tercera opción estructural de `flujo` que la revisión anterior todavía no cubría — el chip
+  "Investment" del formulario ya no acota por nombre de grupo, sino por `flujo = investment`
+  directamente (mismo campo que Inflow/Outflow), y por eso `create_transaction`/`update_transaction`
+  amplían su validación de `gasto` para aceptar ambos flujos no-inflow.
 - RN-040: Registrar un gasto o ingreso actualiza `saldo_actual` de la cuenta asociada sumando el
   monto con signo, de forma atómica junto con la creación del documento en `transactions`.
 - RN-041: La categoría debe existir, pertenecer al usuario, estar en `status = active`, y ser
@@ -1045,6 +1049,7 @@ Sin cambios — reutiliza los índices existentes.
 | 2026-08-11 | Cambio cruzado desde [[categorias]] (RN-118): se revisa **RN-039** — el grupo permitido para `category_id` según `tipo` ya no se identifica por nombre exacto (Bills/Needs/Wants/Investment para gasto, Income para ingreso), sino por el campo estructural `flujo` de `categories` (`outflow`/`inflow`). `create_transaction` y `update_transaction` se actualizan (`supabase/migrations/20260811110000_add_category_group_flow_and_order.sql`), mismos códigos de error (`BIZ_009`), sin cambio de firma. El chip "Investment" del formulario de alta sigue acotando por nombre de grupo, sin cambio — es un subconjunto de Outflow, no una tercera opción de flujo. No se agregan CU ni RN nuevos en este documento. | CU-013, CU-014, CU-017, CU-035 | Se actualiza [[data-model-registry]]: índice de numeración hasta `RN-119` (origen categorías) |
 | 2026-08-22 | Cambio cruzado desde [[ahorros-y-metas]]: se corrige el resumen del módulo (arriba) — una aportación o retiro de meta **no** sigue el patrón de dos documentos enlazados, es una fila única vía el nuevo campo `transactions.meta_id`. El enum `tipo` gana `retiro_meta` (nuevo); `aportacion_meta`, reservado desde el 2026-07-30, queda habilitado. La condición de `transaccion_relacionada_id` se reduce a `tipo = transferencia\|pago_tarjeta` — deja de incluir `aportacion_meta`. `update_transaction` (CU-017) gana el parámetro `p_meta_id` — editable bajo las mismas condiciones que `category_id` (RN-152 de [[ahorros-y-metas]]). `delete_transaction` (CU-018) no requiere cambios — al ser filas únicas, ya revierte correctamente el saldo de la única cuenta involucrada. No se agregan CU ni RN nuevos en este documento. | CU-013, CU-017, CU-018 | Se actualiza [[data-model-registry]]: `transactions.meta_id`, enum `tipo` con `retiro_meta`, condición de `transaccion_relacionada_id` corregida — ver [[ahorros-y-metas]] para el detalle completo |
 | 2026-08-24 | Cambio cruzado desde [[creditos-deudas]]: se corrige el resumen del módulo (arriba) — el pago a una deuda externa, antes fuera de alcance, ya está resuelto como una fila única (mismo patrón que `aportacion_meta`/`retiro_meta`). El enum `tipo` gana `pago_deuda` (nuevo); se agregan `deuda_id`, `monto_capital` y `monto_interes` al esquema de `transactions`, mutuamente excluyentes con `category_id`/`meta_id`. `update_transaction` (CU-017) gana los tres como parámetros editables bajo las mismas condiciones que `category_id`/`meta_id` (`RN-224`, nueva). `delete_transaction` (CU-018) no requiere cambios — al ser fila única, ya revierte correctamente el saldo de la única cuenta involucrada. | CU-013, CU-017, CU-018 | Se actualiza [[data-model-registry]]: `transactions.deuda_id`/`monto_capital`/`monto_interes`, enum `tipo` con `pago_deuda` — ver [[creditos-deudas]] para el detalle completo |
+| 2026-08-28 | Cambio cruzado desde [[categorias]] (RN-118 revisada): se revisa nuevamente **RN-039** — `tipo = gasto` ahora admite `flujo = outflow` **o** `flujo = investment` (antes solo `outflow`); `tipo = ingreso` sigue exigiendo `flujo = inflow`, sin cambio. `create_transaction` y `update_transaction` se actualizan (`supabase/migrations/20260828100001_backfill_category_flow_investment.sql`), mismo código de error (`BIZ_009`), sin cambio de firma. El chip "Investment" del formulario de alta deja de acotar por nombre de grupo — ahora filtra por `flujo = investment` directamente, cerrando la excepción que la revisión de 2026-08-11 había dejado fuera de alcance. No se agregan CU ni RN nuevos en este documento. | CU-013, CU-014, CU-017 | Se actualiza [[data-model-registry]]: enum `category_flow` con `investment`, sin cambio de numeración |
 
 ### CU-035 — Aplicar acciones en lote sobre transacciones (batch actions)
 

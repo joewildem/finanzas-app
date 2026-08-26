@@ -163,22 +163,25 @@ export function BudgetPage() {
 
   // RN-118 (categorías) — el grupo declara su flujo explícitamente; ya no se identifica por nombre.
   // El orden dentro de cada tabla viene heredado de `groups` (useCategoryGroups ya lo entrega
-  // ordenado por `orden`, RN-119).
+  // ordenado por `orden`, RN-119). `investment` se agregó como tercer valor de `flujo` (antes un
+  // subconjunto de outflow) — gana su propia tabla, separada de Outflow.
   const incomeGroups = useMemo(() => (groups ?? []).filter((g) => g.group.flujo === 'inflow'), [groups])
   const outflowGroups = useMemo(() => (groups ?? []).filter((g) => g.group.flujo === 'outflow'), [groups])
+  const investmentGroups = useMemo(() => (groups ?? []).filter((g) => g.group.flujo === 'investment'), [groups])
 
-  const incomeTotal = incomeGroups.reduce(
-    (sum, entry) => sum + entry.categories.reduce((s, category) => s + (amounts[category.id] ?? 0), 0),
-    0,
-  )
-  const outflowTotal = outflowGroups.reduce(
-    (sum, entry) => sum + entry.categories.reduce((s, category) => s + (amounts[category.id] ?? 0), 0),
-    0,
-  )
+  const sumGroups = (entries: typeof incomeGroups) =>
+    entries.reduce(
+      (sum, entry) => sum + entry.categories.reduce((s, category) => s + (amounts[category.id] ?? 0), 0),
+      0,
+    )
+  const incomeTotal = sumGroups(incomeGroups)
+  const outflowTotal = sumGroups(outflowGroups)
+  const investmentTotal = sumGroups(investmentGroups)
   const goalsTotal = (goals ?? []).reduce((sum, goal) => sum + (amounts[goal.id] ?? 0), 0)
   const debtsTotal = (debts ?? []).reduce((sum, debt) => sum + (amounts[debt.id] ?? 0), 0)
-  // RN-075 — ingreso presupuestado menos grupos Outflow, metas de ahorro activas y deudas activas.
-  const toAssign = incomeTotal - outflowTotal - goalsTotal - debtsTotal
+  // RN-075 — ingreso presupuestado menos grupos Outflow, grupos Investment, metas de ahorro activas
+  // y deudas activas.
+  const toAssign = incomeTotal - outflowTotal - investmentTotal - goalsTotal - debtsTotal
 
   function handleCopied() {
     seededMesRef.current = null
@@ -235,6 +238,19 @@ export function BudgetPage() {
         goals={goals ?? []}
         debts={debts ?? []}
         emptyMessage="No categories yet."
+      />
+
+      <BudgetTable
+        title="Investment"
+        groups={investmentGroups}
+        amounts={amounts}
+        actuals={actuals}
+        isIncome={false}
+        shadeGroupRows
+        openGroups={openGroups}
+        onToggleGroup={handleToggleGroup}
+        onChangeAmount={handleChangeAmount}
+        emptyMessage="No investment categories yet."
       />
     </div>
   )

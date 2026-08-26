@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { useCategoryGroups } from '@/hooks/use-category-groups'
-import type { Category, CategoryGroup } from '@/lib/categories'
+import { CATEGORY_FLOW_LABELS, type Category, type CategoryGroup } from '@/lib/categories'
 import { getCategoryIcon } from '@/lib/category-icons'
 import { supabase } from '@/lib/supabase'
 
@@ -117,7 +117,7 @@ export function CategoriesPage() {
                     style={{ backgroundColor: group.color }}
                   />
                   <CardTitle>{group.nombre}</CardTitle>
-                  <Badge variant="secondary">{group.flujo === 'inflow' ? 'Inflow' : 'Outflow'}</Badge>
+                  <Badge variant="secondary">{CATEGORY_FLOW_LABELS[group.flujo]}</Badge>
                   {group.status === 'archived' && <Badge variant="secondary">Archived</Badge>}
                 </div>
                 <div className="flex items-center gap-2">

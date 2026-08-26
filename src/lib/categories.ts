@@ -1,6 +1,12 @@
 export type CategoryKind = 'grupo' | 'categoria'
 export type CategoryStatus = 'active' | 'archived'
-export type CategoryFlow = 'inflow' | 'outflow'
+export type CategoryFlow = 'inflow' | 'outflow' | 'investment'
+
+export const CATEGORY_FLOW_LABELS: Record<CategoryFlow, string> = {
+  inflow: 'Inflow',
+  outflow: 'Outflow',
+  investment: 'Investment',
+}
 
 export interface CategoryGroup {
   id: string

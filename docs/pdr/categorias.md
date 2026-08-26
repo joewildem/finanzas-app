@@ -27,7 +27,8 @@ ocultamiento) que necesita el usuario avanzado.
 
 Esta funcionalidad permitirá al usuario crear un nuevo grupo de categorías (ej. "Bills", "Needs"),
 como contenedor de nivel superior para organizar sus categorías de gasto e ingreso. Para ello será
-necesario capturar el nombre del grupo, declarar explícitamente su tipo de flujo (Inflow/Outflow) y,
+necesario capturar el nombre del grupo, declarar explícitamente su tipo de flujo
+(Inflow/Outflow/Investment) y,
 opcionalmente, elegir un color distintivo, usado posteriormente para diferenciar visualmente cada
 grupo en dashboards, reportes y gráficas. Los grupos no llevan ícono — ese atributo es exclusivo de
 las categorías dentro de ellos (ver CU-008).
@@ -37,8 +38,8 @@ las categorías dentro de ellos (ver CU-008).
 1. El usuario accede a la sección "Categorías" y selecciona "Agregar grupo".
 2. El sistema muestra el formulario de alta de grupo.
 3. El usuario captura el nombre.
-4. El usuario elige el tipo de flujo del grupo: Inflow (entrada) u Outflow (salida) — sin valor por
-   defecto, es una elección explícita (RN-118).
+4. El usuario elige el tipo de flujo del grupo: Inflow (entrada), Outflow (salida) o Investment
+   (capital invertido) — sin valor por defecto, es una elección explícita (RN-118).
 5. El usuario, opcionalmente, elige un color (de la paleta de 16 predefinidos definida en
    [[cuentas]] o mediante el editor hexadecimal libre).
 6. El usuario confirma la creación.
@@ -63,7 +64,7 @@ las categorías dentro de ellos (ver CU-008).
 **Postcondiciones**
 
 - Se crea un nuevo documento en la colección `categories` con `tipo = "grupo"`, `grupo_id = null`,
-  `flujo` (Inflow/Outflow) y `orden` (siguiente posición disponible), asociado al `user_id` del
+  `flujo` (Inflow/Outflow/Investment) y `orden` (siguiente posición disponible), asociado al `user_id` del
   usuario autenticado.
 - El grupo queda disponible como contenedor al crear categorías (CU-008).
 
@@ -72,7 +73,7 @@ las categorías dentro de ellos (ver CU-008).
 | Campo | Tipo de control | Obligatorio | Longitud | Formato / validación | Dependencias | Valor por defecto | Regla de negocio |
 |---|---|---|---|---|---|---|---|
 | `nombre` | Texto | Sí | 2–30 caracteres | Letras, números y espacios | Único entre grupos del mismo usuario | — | RN-022 |
-| `flujo` | Selección única (Inflow / Outflow) | Sí | N/A | Enum: `inflow`, `outflow` | — | Sin default — elección explícita | RN-118 |
+| `flujo` | Selección única (Inflow / Outflow / Investment) | Sí | N/A | Enum: `inflow`, `outflow`, `investment` | — | Sin default — elección explícita | RN-118 |
 | `color` | Selector de color (16 predefinidos + editor hexadecimal libre) | No | 7 caracteres | Código hexadecimal `#RRGGBB` | — | `#9CA3AF` (gris) | RN-023 |
 | `orden` | N/A — asignado por el sistema | Sí (automático) | N/A | Entero | — | Siguiente posición disponible del usuario | RN-119 |
 
@@ -93,18 +94,26 @@ las categorías dentro de ellos (ver CU-008).
   (nombrado "Ingresos" al documentarse, traducido a inglés al construirse — ver historial de
   cambios) se agregó al catálogo semilla al construir [[transacciones]] (2026-07-30), ya que ese
   módulo requiere categorizar los movimientos de tipo `ingreso` de forma simétrica a los de `gasto`.
-  Los 5 grupos predefinidos también fijan `flujo`/`orden` desde su siembra: Bills, Needs, Wants e
-  Investment quedan como Outflow (posiciones 0 a 3), e Income como Inflow (posición 4).
-- RN-118: Todo grupo declara explícitamente su tipo de flujo (`flujo`: Inflow u Outflow) al
-  crearse — no hay valor por defecto implícito, es una elección obligatoria en el formulario. Es
-  editable en cualquier momento (CU-010), sin restricciones adicionales: mover un grupo de Outflow
-  a Inflow (o viceversa) reclasifica de inmediato sus categorías y cualquier módulo que dependa de
-  esa clasificación (ej. [[presupuesto]], que agrupa sus tablas Inflow/Outflow por este campo), ya
-  que no se duplica el valor en otras colecciones. Las categorías (`tipo = "categoria"`) no llevan
-  este campo — heredan el flujo de su grupo en tiempo de consulta, igual que heredan su `color`
-  hoy. Reemplaza la identificación por nombre de grupo (`"Income"`, `"Bills"`, etc.) que usaban
-  [[presupuesto]] y [[transacciones]] (RN-039) antes de este campo — un grupo renombrado ya no
-  pierde su clasificación.
+  Los 5 grupos predefinidos también fijan `flujo`/`orden` desde su siembra: Bills, Needs y Wants
+  quedan como Outflow (posiciones 0 a 2), Investment como Investment (posición 3, ver RN-118) e
+  Income como Inflow (posición 4).
+- RN-118: Todo grupo declara explícitamente su tipo de flujo (`flujo`: Inflow, Outflow o
+  Investment) al crearse — no hay valor por defecto implícito, es una elección obligatoria en el
+  formulario. Es editable en cualquier momento (CU-010), sin restricciones adicionales: cambiar el
+  flujo de un grupo reclasifica de inmediato sus categorías y cualquier módulo que dependa de esa
+  clasificación (ej. [[presupuesto]], que agrupa sus tablas Inflow/Outflow/Investment por este
+  campo), ya que no se duplica el valor en otras colecciones. Las categorías (`tipo = "categoria"`)
+  no llevan este campo — heredan el flujo de su grupo en tiempo de consulta, igual que heredan su
+  `color` hoy. Reemplaza la identificación por nombre de grupo (`"Income"`, `"Bills"`, etc.) que
+  usaban [[presupuesto]] y [[transacciones]] (RN-039) antes de este campo — un grupo renombrado ya
+  no pierde su clasificación. **Revisado 2026-08-28** (al alinear la pestaña Analytics de
+  [[dashboard]]): se agrega `investment` como tercer valor del enum. Hasta entonces, el grupo
+  "Investment" era un subconjunto de Outflow distinguido únicamente por nombre exacto en el chip
+  del formulario de alta de transacciones y en el cálculo de ingresos vs. gastos del viejo
+  [[reportes]] (RN-094, retirado) — ambos casos frágiles ante un renombrado, documentados en su
+  momento como "queda fuera de este cambio" (ver RN-039 de [[transacciones]]). Con `investment`
+  como valor estructural, esa distinción deja de depender del nombre en cualquier lugar del
+  sistema.
 - RN-119: Todo grupo tiene una posición manual de despliegue (`orden`), asignada automáticamente al
   crearse como la siguiente disponible del usuario (RN-118 no afecta el conteo — Inflow y Outflow
   comparten una sola secuencia). Es reordenable desde CU-009 con controles de mover arriba/abajo
@@ -131,7 +140,7 @@ las categorías dentro de ellos (ver CU-008).
 | Campo | Tipo | Reglas | Mitigación OWASP |
 |---|---|---|---|
 | `nombre` | string | Requerido, 2–30 caracteres, único entre grupos del usuario | A03 — Sanitizar entrada; A07 — Codificar en salida |
-| `flujo` | string | Requerido, enum: `inflow`, `outflow` | A03 — Validar contra el enum antes de persistir |
+| `flujo` | string | Requerido, enum: `inflow`, `outflow`, `investment` | A03 — Validar contra el enum antes de persistir |
 | `color` | string | Opcional; debe cumplir el formato hexadecimal `^#[0-9A-Fa-f]{6}$` | A03 — Validar formato con regex antes de persistir; nunca interpolar sin validar en atributos de estilo |
 
 **Mensajes de error**
@@ -423,7 +432,8 @@ grupos con controles de mover arriba/abajo.
 2. El sistema recupera los grupos del usuario con `status = active`, y para cada uno sus categorías
    con `status = active`, ordenando los grupos por `orden` ascendente.
 3. El sistema muestra la vista jerárquica: cada grupo con su color, su etiqueta de flujo
-   (Inflow/Outflow) y controles de mover arriba/abajo, y debajo sus categorías con su ícono.
+   (Inflow/Outflow/Investment) y controles de mover arriba/abajo, y debajo sus categorías con su
+   ícono.
 4. El usuario puede alternar el filtro para incluir ocultos.
 5. El usuario puede reordenar un grupo con los controles de mover arriba/abajo — el sistema
    intercambia su `orden` con el del grupo inmediato vecino en la lista visible (RN-119) y refresca
@@ -600,7 +610,7 @@ se hace con los controles de mover arriba/abajo de CU-009.
 | Campo | Tipo de control | Obligatorio | Longitud | Formato / validación | Dependencias | Valor por defecto | Regla de negocio |
 |---|---|---|---|---|---|---|---|
 | `nombre` | Texto | No | 2–30 caracteres | Letras, números y espacios | Único entre grupos (excluyendo el grupo actual) | valor actual | RN-031 |
-| `flujo` | Selección única (Inflow / Outflow) | No | N/A | Enum: `inflow`, `outflow` | — | valor actual | Ver RN-118 (CU-007) |
+| `flujo` | Selección única (Inflow / Outflow / Investment) | No | N/A | Enum: `inflow`, `outflow`, `investment` | — | valor actual | Ver RN-118 (CU-007) |
 | `color` | Selector de color (16 predefinidos + editor hexadecimal libre) | No | 7 caracteres | Código hexadecimal `#RRGGBB` | — | valor actual | Ver RN-023 (CU-007) |
 
 **Reglas de negocio**
@@ -1032,6 +1042,7 @@ optimiza la cascada (buscar categorías activas de un grupo) y el listado por st
 | 2026-07-30 | Cambio cruzado desde [[transacciones]]: se agrega "Ingresos" al catálogo de grupos predefinidos (RN-025), para categorizar movimientos de tipo `ingreso` de forma simétrica a los de gasto. No se agregan CU ni RN nuevos en este documento — solo se amplía el enum de grupos semilla ya existente | CU-007 | Se actualiza [[data-model-registry]] (sin cambio de esquema, solo nota de contexto) |
 | 2026-08-07 | Se construye el módulo Categorías completo (CU-007 a CU-012) sobre Postgres/Supabase: tabla `categories`, RPC `archive_category_group` para el archivado en cascada de CU-012, y la siembra real de grupos/categorías predefinidos (antes un placeholder desde el módulo Auth). Sincronización de idioma con la UI (100% inglés): el grupo semilla "Ingresos" se sembró como "Income", y los ejemplos de categoría citados en este documento ("Renta", "Suscripciones") se tradujeron a "Rent"/"Subscriptions" para reflejar los nombres reales que ve el usuario — sin cambio de CU, RN ni de las reglas de negocio en sí | CU-007 a CU-012 | Se actualiza [[data-model-registry]] con el esquema Postgres real de `categories`, sus índices y relaciones marcados "Real" |
 | 2026-08-11 | Se agregan dos columnas estructurales exclusivas de grupo, ambas nuevas en `categories` (`supabase/migrations/20260811110000_add_category_group_flow_and_order.sql`): **RN-118** (`flujo`: Inflow/Outflow, obligatorio al crear, editable en CU-010) y **RN-119** (`orden`: posición manual, asignada automáticamente al crear, reordenable con controles ↑/↓ agregados a CU-009). Reemplazan la identificación de grupos por nombre (`"Income"`, `"Bills"`/`"Needs"`/`"Wants"`/`"Investment"`) que usaban [[presupuesto]] (tablas Inflow/Outflow) y [[transacciones]] (RN-039, `create_transaction`/`update_transaction`) — un grupo renombrado dejaba de reconocerse, que fue el bug reportado que motivó este cambio. Se actualiza CU-007 (campo `flujo` obligatorio y `orden` automático), CU-009 (orden por `orden` en vez de alfabético, controles de reordenar) y CU-010 (campo `flujo` editable). Backfill de datos reales: los grupos existentes conservan su flujo/orden actuales (Income → Inflow, el resto → Outflow; orden visual sin cambio). | CU-007, CU-009, CU-010 | Se actualiza [[data-model-registry]]: esquema de `categories` (enum `category_flow`, columnas `flujo`/`orden`), índice de numeración hasta `RN-119`; cambio cruzado en [[presupuesto]] (RN-075, RN-114, RN-117, referencia de diseño) y [[transacciones]] (RN-039) |
+| 2026-08-28 | Al alinear la pestaña Analytics de [[dashboard]], se agrega **`investment`** como tercer valor de `categories.flujo` (RN-118 revisada), reemplazando la distinción por nombre exacto ("Investment") que hasta ahora usaban el chip del formulario de alta de transacciones y el viejo cálculo de ingresos vs. gastos de [[reportes]] (RN-094, retirado) — ambos casos ya documentados como frágiles ante un renombrado. Backfill: el grupo semilla "Investment" de cuentas existentes pasa de `outflow` a `investment`; `seed_default_categories_for_user` siembra el grupo nuevo directamente como `investment`. No se agregan CU nuevos — es una extensión de un enum ya existente, sin cambio de comportamiento salvo la reclasificación del grupo Investment. `supabase/migrations/20260828100000_add_category_flow_investment.sql` (solo agrega el valor al enum — Postgres exige que se confirme antes de usarlo) + `supabase/migrations/20260828100001_backfill_category_flow_investment.sql` (backfill, siembra, RPCs). | CU-007, CU-010 | Se actualiza [[data-model-registry]] (enum `category_flow` en el esquema de `categories`, sin cambio de numeración); cambio cruzado en [[presupuesto]] (RN-075, tabla "Investment" nueva) y [[transacciones]] (RN-039, ya no hay excepción por nombre) |
 
 ## Referencias
 

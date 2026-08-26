@@ -1,6 +1,7 @@
-import { addMonths, format, isAfter, startOfMonth, startOfYear, subMonths } from 'date-fns'
+import { isAfter } from 'date-fns'
 
 import type { Account } from '@/lib/accounts'
+import { computePeriodMonths, PERIOD_LABELS, type Period } from '@/lib/date-periods'
 import { computeSaldoActual, DEBT_TYPE_LABELS, type Debt, type DebtType } from '@/lib/debts'
 import { computeExposureBreakdown, type Investment } from '@/lib/investments'
 
@@ -143,50 +144,12 @@ export function computeInvestmentValueAsOf(history: { fecha: string; balance: nu
 }
 
 // --- Rango de meses navegable (RN-251) ---------------------------------------------------------
+//
+// Movido a `@/lib/date-periods` (2026-08-28) — Analytics (CU-069/CU-070) usa el mismo vocabulario
+// de periodo (1M/6M/YTD/1Y/All/Custom); se generaliza en un solo lugar en vez de duplicar la
+// lógica de rangos. Re-exportado aquí con el nombre original para no tocar los call sites
+// existentes (`use-networth-history.ts`, `networth-tab.tsx`, `networth-line-chart-card.tsx`).
 
-export type NetworthPeriod = '1m' | '6m' | 'ytd' | '1y' | 'all' | 'custom'
-
-export const NETWORTH_PERIOD_LABELS: Record<NetworthPeriod, string> = {
-  '1m': '1M',
-  '6m': '6M',
-  ytd: 'YTD',
-  '1y': '1Y',
-  all: 'All',
-  custom: 'Custom',
-}
-
-function lastNMonths(n: number, referenceDate: Date): string[] {
-  return Array.from({ length: n }, (_, i) => format(subMonths(referenceDate, n - 1 - i), 'yyyy-MM'))
-}
-
-function monthsBetween(start: Date, end: Date): string[] {
-  const months: string[] = []
-  let cursor = startOfMonth(start)
-  const last = startOfMonth(end)
-  while (!isAfter(cursor, last)) {
-    months.push(format(cursor, 'yyyy-MM'))
-    cursor = addMonths(cursor, 1)
-  }
-  return months
-}
-
-export function computeNetworthMonths(
-  periodo: NetworthPeriod,
-  opts: { earliestDate?: Date | null; fechaInicio?: Date; fechaFin?: Date; today?: Date } = {},
-): string[] {
-  const today = opts.today ?? new Date()
-  switch (periodo) {
-    case '1m':
-      return lastNMonths(2, today)
-    case '6m':
-      return lastNMonths(6, today)
-    case '1y':
-      return lastNMonths(12, today)
-    case 'ytd':
-      return monthsBetween(startOfYear(today), today)
-    case 'all':
-      return opts.earliestDate ? monthsBetween(opts.earliestDate, today) : []
-    case 'custom':
-      return opts.fechaInicio && opts.fechaFin ? monthsBetween(opts.fechaInicio, opts.fechaFin) : []
-  }
-}
+export type NetworthPeriod = Period
+export const NETWORTH_PERIOD_LABELS = PERIOD_LABELS
+export const computeNetworthMonths = computePeriodMonths

@@ -13,6 +13,7 @@ import { DEFAULT_ACCOUNT_COLOR } from '@/lib/accounts'
 const FLOW_OPTIONS = [
   { value: 'inflow', label: 'Inflow' },
   { value: 'outflow', label: 'Outflow' },
+  { value: 'investment', label: 'Investment' },
 ] as const
 
 // Esquema espejo de los CHECK de la migración (supabase/migrations/..._create_categories_module.sql,
@@ -27,7 +28,7 @@ const categoryGroupFormSchema = z.object({
     .max(30, 'VALIDATION_001')
     .regex(/^[\p{L}\p{N} ]+$/u, 'VALIDATION_001'),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'VALIDATION_008'),
-  flujo: z.enum(['inflow', 'outflow'], { message: 'VALIDATION_001' }),
+  flujo: z.enum(['inflow', 'outflow', 'investment'], { message: 'VALIDATION_001' }),
 })
 
 export type CategoryGroupFormValues = z.infer<typeof categoryGroupFormSchema>
@@ -79,7 +80,7 @@ export function CategoryGroupForm({
             <Select value={field.value} onValueChange={field.onChange}>
               <SelectTrigger id="grupo_flujo" className="w-full">
                 <SelectValue>
-                  {(value: 'inflow' | 'outflow') =>
+                  {(value: 'inflow' | 'outflow' | 'investment') =>
                     FLOW_OPTIONS.find((option) => option.value === value)?.label
                   }
                 </SelectValue>
@@ -96,7 +97,8 @@ export function CategoryGroupForm({
         />
         {errors.flujo && <p className="text-sm text-destructive">Select a flow type.</p>}
         <p className="text-xs text-muted-foreground">
-          Determines whether this group's categories appear under Inflow or Outflow in Budget.
+          Determines whether this group's categories appear under Inflow, Outflow, or Investment in
+          Budget.
         </p>
       </div>
 

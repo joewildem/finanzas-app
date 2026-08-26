@@ -20,10 +20,30 @@ no técnico antes de formalizar cada una — este documento crece con cada pesta
 su evolución mensual, y el resumen de tarjetas de crédito (utilización, disponible, y avance de
 gasto contra el mínimo mensual por ciclo de corte) junto con su evolución de gasto mensual.
 
-**Networth** (esta entrega) informa sobre el patrimonio neto del usuario: un desglose de Cash &
-Savings, Investments y Liabilities (columna izquierda), la evolución histórica del Networth total
-con selector de periodo (columna derecha), un comparativo Assets vs Liabilities, y una meta de
-Networth configurable con su avance. **Analytics** queda pendiente de documentar.
+**Networth** informa sobre el patrimonio neto del usuario: un desglose de Cash & Savings,
+Investments y Liabilities (columna izquierda), la evolución histórica del Networth total con
+selector de periodo (columna derecha), un comparativo Assets vs Liabilities, y una meta de Networth
+configurable con su avance.
+
+**Analytics** (esta entrega, la última pestaña del Dashboard) informa sobre el movimiento de dinero
+del usuario: cuatro cards de resumen (Income, Expenses, Savings, Investment) con comparativo contra
+el periodo anterior equivalente, una gráfica de Cash Flow (Income vs Expenses en el tiempo), y una
+card de barras horizontales por cada grupo de categorías del usuario, mostrando su distribución
+interna por categoría. Con esta pestaña se completa la fase de construcción en código de todo el
+alcance definido del producto (ver `docs/strategy/estrategia.md`).
+
+> **Nota de sucesión:** CU-069 a CU-071 (Analytics) suceden funcionalmente a CU-027, CU-028, CU-030
+> y CU-031 de [[reportes]] (pestaña "Reporte Mensual": resumen por grupo, distribución de gasto por
+> categoría, ingresos vs. gastos, frecuencia de transacciones) — con una diferencia estructural
+> importante: el viejo cálculo de ingresos vs. gastos (RN-094, retirado) excluía el grupo
+> "Investment" del gasto por nombre exacto, un hack documentado como frágil en su momento. Analytics
+> resuelve esa fragilidad de raíz: `categories.flujo` gana un tercer valor estructural,
+> `investment` (ver RN-118 revisada en [[categorias]]), y con eso Investment deja de ser un caso
+> especial — es simplemente su propia card, sin traslape con Expenses. La frecuencia de
+> transacciones (CU-031 de [[reportes]]) **no** se retoma en Analytics — no estaba en el alcance
+> descrito por el usuario para esta pestaña; queda en [[backlog]] como posible extensión futura. Los
+> números `CU-023`–`CU-031` y `RN-076`–`RN-097` de [[reportes]] no se reutilizan ni se renumeran —
+> quedan como registro histórico; ver [[data-model-registry]].
 
 > **Nota de nomenclatura:** la palabra "Assets" se usa en dos sentidos distintos dentro de esta
 > pestaña, y se documenta explícitamente para evitar confusión al leer las reglas de negocio. La
@@ -1172,11 +1192,406 @@ Introduce la tabla nueva `networth_goals` — ver detalle en [[data-model-regist
 
 ---
 
+### CU-069 — Consultar resumen de Income, Expenses, Savings e Investment
+
+**Actor:** Usuario autenticado (dueño de los datos)
+
+**Descripción del caso de uso**
+
+Esta funcionalidad permitirá al usuario consultar, en la pestaña "Analytics" del Dashboard, cuatro
+cards con el total de Income, Expenses, Savings e Investment dentro de un periodo seleccionado, cada
+una con un indicador de crecimiento o caída respecto al periodo anterior equivalente.
+
+**Flujo principal**
+
+1. El usuario accede a la pestaña "Analytics" y selecciona un periodo: 1M, 6M, YTD, 1Y, All o un
+   rango personalizado (Custom); por defecto, "1M".
+2. El sistema resuelve el rango de fechas del periodo seleccionado y, salvo que sea "All", el rango
+   del periodo inmediatamente anterior de igual longitud, para la comparación.
+3. El sistema calcula Income (suma de `transactions` `tipo = ingreso` de categorías de grupos
+   `flujo = inflow`), Expenses (suma en valor absoluto de `tipo = gasto` de grupos
+   `flujo = outflow`), Savings (suma con signo invertido de `tipo` en `aportacion_meta`/
+   `retiro_meta`) e Investment (suma en valor absoluto de `tipo = gasto` de grupos
+   `flujo = investment`), todos dentro del rango del periodo actual.
+4. El sistema repite el mismo cálculo sobre el rango del periodo anterior (si aplica) y calcula el %
+   de variación de cada card.
+5. El sistema muestra las cuatro cards con su monto y, salvo en "All", un indicador verde (creció) o
+   rojo (disminuyó) con el % de variación.
+
+**Flujos alternativos / casos borde**
+
+- Con el periodo "All" no se muestra ningún indicador de variación — no hay un "periodo anterior"
+  contra el cual comparar.
+- Si el valor del periodo anterior es `$0`, no se muestra indicador de variación para esa card (un
+  porcentaje sobre base cero no es representativo) — se muestra solo el monto actual.
+- Movimientos de metas de ahorro archivadas dentro del rango del periodo sí cuentan para Savings —
+  el movimiento ya ocurrió, independientemente del estado actual de la meta (mismo criterio que
+  [[reportes]] aplicaba a categorías archivadas).
+- En el periodo "Custom", si la fecha de inicio es posterior a la fecha de fin, se rechaza con
+  `VALIDATION_036` (reutilizado de CU-066).
+
+**Precondiciones**
+
+- El usuario debe estar autenticado.
+
+**Postcondiciones**
+
+- Ninguna — caso de uso de solo lectura.
+
+**Definición detallada de campos**
+
+| Campo | Tipo de control | Obligatorio | Longitud | Formato / validación | Dependencias | Valor por defecto | Regla de negocio |
+|---|---|---|---|---|---|---|---|
+| `periodo` (query param) | Segmentador | No | — | Enum: `1m`, `6m`, `ytd`, `1y`, `all`, `custom` | — | `1m` | RN-261 |
+| `fecha_inicio` (query param) | Date picker | Sí, solo si `periodo=custom` | — | Fecha válida | `periodo=custom` | — | RN-261 |
+| `fecha_fin` (query param) | Date picker | Sí, solo si `periodo=custom` | — | Fecha válida, ≥ `fecha_inicio` | `periodo=custom` | — | RN-261 |
+
+**Reglas de negocio**
+
+- RN-257: Income = Σ `transactions.monto` con `tipo = ingreso` cuya categoría pertenece a un grupo
+  con `flujo = inflow`, dentro del rango del periodo seleccionado.
+- RN-258: Expenses = Σ `abs(transactions.monto)` con `tipo = gasto` cuya categoría pertenece a un
+  grupo con `flujo = outflow`, dentro del rango del periodo seleccionado. Los grupos con
+  `flujo = investment` quedan fuera — tienen su propia card (RN-260), sin traslape.
+- RN-259: Savings = Σ con signo invertido de `transactions.monto` con `tipo` en `aportacion_meta` o
+  `retiro_meta`, dentro del rango del periodo seleccionado (aportaciones suman, retiros restan) —
+  incluye movimientos de metas archivadas si el movimiento cayó dentro del periodo.
+- RN-260: Investment = Σ `abs(transactions.monto)` con `tipo = gasto` cuya categoría pertenece a un
+  grupo con `flujo = investment`, dentro del rango del periodo seleccionado.
+- RN-261: El periodo de comparación (para el % de variación) según el periodo seleccionado: `1m` =
+  mes calendario inmediatamente anterior; `6m` = los 6 meses calendario inmediatamente anteriores;
+  `ytd` = el mismo rango (1 de enero a la misma fecha) del año anterior; `1y` = los 12 meses
+  inmediatamente anteriores; `custom` = el mismo número de días, inmediatamente antes de
+  `fecha_inicio`; `all` = sin comparación (RN-263).
+- RN-262: % de variación = `(valor_actual − valor_anterior) ÷ abs(valor_anterior)`. Si
+  `valor_anterior = 0`, no se calcula (RN-263).
+- RN-263: El indicador es verde si `valor_actual > valor_anterior`, rojo si `valor_actual <
+  valor_anterior`, y no se muestra si son iguales, si el periodo es `all`, o si `valor_anterior = 0`
+  — la dirección del indicador es siempre "creció/disminuyó", sin importar si ese cambio es
+  financieramente positivo o negativo para esa card en particular (ej. un aumento en Expenses se
+  muestra en verde, igual que un aumento en Income).
+
+**Casos de uso derivados identificados**
+
+- Ninguno adicional.
+
+**Validaciones**
+
+| Campo | Tipo | Reglas | Mitigación OWASP |
+|---|---|---|---|
+| `periodo` | enum | Uno de `1m`, `6m`, `ytd`, `1y`, `all`, `custom` | A03 — Validar contra catálogo cerrado |
+| `fecha_inicio`, `fecha_fin` | date | Obligatorias si `periodo=custom`; `fecha_fin ≥ fecha_inicio` | A03 — Validar formato y rango de fecha |
+
+**Mensajes de error**
+
+*Validación*
+- `VALIDATION_036`: "La fecha final no puede ser anterior a la fecha inicial." *(reutilizado de CU-066)*
+
+*Autenticación / autorización*
+- `AUTH_001`: "Tu sesión ha expirado. Inicia sesión nuevamente." *(reutilizado)*
+
+*Sistema*
+- `SYS_001`: "Ocurrió un error inesperado. Intenta de nuevo más tarde." *(reutilizado)*
+
+**Requerimientos técnicos backend**
+
+*Definición del servicio*
+
+| Método | Endpoint | Auth |
+|---|---|---|
+| GET | `/api/v1/dashboard/analytics-summary?periodo={periodo}&fecha_inicio={fecha_inicio}&fecha_fin={fecha_fin}` | Bearer JWT |
+
+*Request*
+```json
+{}
+```
+
+*Response (éxito)*
+```json
+{
+  "periodo": "1m",
+  "income": { "monto": 38420.00, "monto_anterior": 34560.00, "variacion": 0.1117 },
+  "expenses": { "monto": 24910.00, "monto_anterior": 26290.00, "variacion": -0.0525 },
+  "savings": { "monto": 1200.00, "monto_anterior": 900.00, "variacion": 0.3333 },
+  "investment": { "monto": 3500.00, "monto_anterior": 3500.00, "variacion": null }
+}
+```
+
+*Modelo de información*
+
+No introduce colección nueva — consulta agregada sobre `transactions`, `categories` y
+`savings_goals`.
+
+*Decisiones de modelado*
+
+| Relación | Patrón | Justificación |
+|---|---|---|
+| Agregación en tiempo de consulta | Cálculo derivado, no persistido | Mismo patrón que el resto del Dashboard |
+| Resolución de periodo/comparación compartida con Networth | Helper común (`src/lib/date-periods.ts`) | CU-066 (Networth) y este CU usan el mismo vocabulario de periodo (`1m`/`6m`/`ytd`/`1y`/`all`/`custom`); se generaliza en un solo lugar en vez de duplicar la lógica de rangos |
+
+**Matriz de pruebas**
+
+| # | Categoría | Escenario | Input | Resultado esperado | HTTP |
+|---|---|---|---|---|---|
+| 1 | Flujo exitoso | Usuario con movimientos en las 4 categorías, periodo `1m` | `periodo=1m` | 4 montos correctos, con % de variación | 200 |
+| 2 | Lógica de negocio | Periodo `all` | `periodo=all` | Sin indicador de variación en ninguna card | 200 |
+| 3 | Lógica de negocio | `valor_anterior = 0` en una card | — | Esa card no muestra indicador | 200 |
+| 4 | Lógica de negocio | Meta de ahorro archivada con movimientos en el periodo | — | Cuentan para Savings | 200 |
+| 5 | Validación de entrada | `custom` con `fecha_fin < fecha_inicio` | — | `VALIDATION_036` | 400 |
+| 6 | Autenticación / autorización | Token expirado o ausente | Sin JWT válido | `AUTH_001` | 401 |
+| 7 | Error del sistema | Falla de base de datos | Simulado | `SYS_001` | 500 |
+
+**Referencia de diseño**
+
+- Pantalla / flujo: Figma — [Analytics tab](https://www.figma.com/design/McS1WiO2R2Z8sKpJBfkOx6/Finanzas-App---Artes?node-id=64-303) (cards de resumen)
+
+---
+
+### CU-070 — Consultar gráfica de Cash Flow (Income vs Expenses)
+
+**Actor:** Usuario autenticado (dueño de los datos)
+
+**Descripción del caso de uso**
+
+Esta funcionalidad permitirá al usuario consultar, dentro de la pestaña "Analytics", una gráfica de
+línea comparando Income vs Expenses a lo largo del tiempo, para el periodo seleccionado — mismo
+segmentador de periodo que CU-069.
+
+**Flujo principal**
+
+1. El usuario, dentro de "Analytics", visualiza la card "Cash Flow" (comparte el periodo
+   seleccionado en CU-069).
+2. El sistema determina el rango de meses correspondiente al periodo seleccionado.
+3. Para cada mes del rango, el sistema calcula Income y Expenses de ese mes (mismos criterios de
+   RN-257/RN-258, acotados al mes).
+4. El sistema devuelve la serie mensual de ambas series, lista para graficarse como dos líneas.
+
+**Flujos alternativos / casos borde**
+
+- La granularidad es siempre mensual, sin importar el periodo seleccionado — mismo criterio que
+  RN-250 de Networth (CU-066).
+- Si el usuario no tiene ningún movimiento de ingreso o gasto, se muestra un estado vacío en vez de
+  la gráfica.
+
+**Precondiciones**
+
+- El usuario debe estar autenticado.
+
+**Postcondiciones**
+
+- Ninguna — caso de uso de solo lectura.
+
+**Definición detallada de campos**
+
+_Comparte los mismos parámetros de periodo que CU-069 — ver esa tabla._
+
+**Reglas de negocio**
+
+- RN-264: La granularidad del histórico es siempre mensual, sin importar el periodo seleccionado.
+- RN-265: El rango de meses se resuelve con el mismo mecanismo que RN-251 (Networth, CU-066),
+  generalizado vía el helper compartido de periodo.
+- RN-266: Income y Expenses de cada punto usan los mismos criterios de RN-257/RN-258, acotados al
+  mes de ese punto (sin acumular entre meses).
+
+**Casos de uso derivados identificados**
+
+- Ninguno adicional.
+
+**Validaciones**
+
+_Comparte las mismas validaciones de periodo que CU-069._
+
+**Mensajes de error**
+
+*Autenticación / autorización*
+- `AUTH_001`: "Tu sesión ha expirado. Inicia sesión nuevamente." *(reutilizado)*
+
+*Sistema*
+- `SYS_001`: "Ocurrió un error inesperado. Intenta de nuevo más tarde." *(reutilizado)*
+
+**Requerimientos técnicos backend**
+
+*Definición del servicio*
+
+| Método | Endpoint | Auth |
+|---|---|---|
+| GET | `/api/v1/dashboard/analytics-cash-flow?periodo={periodo}&fecha_inicio={fecha_inicio}&fecha_fin={fecha_fin}` | Bearer JWT |
+
+*Request*
+```json
+{}
+```
+
+*Response (éxito)*
+```json
+{
+  "meses": [
+    { "mes": "2026-07", "income": 35200.00, "expenses": 22100.00 },
+    { "mes": "2026-08", "income": 38420.00, "expenses": 24910.00 }
+  ]
+}
+```
+
+*Modelo de información*
+
+No introduce colección nueva — consulta agregada sobre `transactions` y `categories`.
+
+*Decisiones de modelado*
+
+| Relación | Patrón | Justificación |
+|---|---|---|
+| Agregación en tiempo de consulta | Cálculo derivado, no persistido | Mismo patrón que CU-069 y el resto del Dashboard |
+
+**Matriz de pruebas**
+
+| # | Categoría | Escenario | Input | Resultado esperado | HTTP |
+|---|---|---|---|---|---|
+| 1 | Flujo exitoso | Usuario con ingresos y gastos en varios meses | `periodo=1y` | Serie mensual de ambas líneas | 200 |
+| 2 | Lógica de negocio | Usuario sin movimientos | — | Estado vacío | 200 |
+| 3 | Autenticación / autorización | Token expirado o ausente | Sin JWT válido | `AUTH_001` | 401 |
+| 4 | Error del sistema | Falla de base de datos | Simulado | `SYS_001` | 500 |
+
+**Referencia de diseño**
+
+- Pantalla / flujo: Figma — [Analytics tab](https://www.figma.com/design/McS1WiO2R2Z8sKpJBfkOx6/Finanzas-App---Artes?node-id=64-303) (card "Cash Flow")
+
+---
+
+### CU-071 — Consultar distribución por categoría de cada grupo
+
+**Actor:** Usuario autenticado (dueño de los datos)
+
+**Descripción del caso de uso**
+
+Esta funcionalidad permitirá al usuario consultar, dentro de la pestaña "Analytics", una card por
+cada grupo activo de categorías del usuario (Inflow, Outflow e Investment por igual), con una
+gráfica de barras horizontales de sus categorías internas, ordenadas de mayor a menor monto dentro
+del periodo seleccionado.
+
+**Flujo principal**
+
+1. El usuario, dentro de "Analytics", visualiza la cuadrícula de cards de distribución (comparte el
+   periodo seleccionado en CU-069).
+2. El sistema identifica los grupos activos de categorías del usuario.
+3. Para cada grupo, el sistema calcula el monto de cada una de sus categorías dentro del periodo
+   seleccionado (`tipo = ingreso` para grupos `inflow`, `tipo = gasto` para `outflow`/`investment`).
+4. El sistema muestra una card por grupo, con sus categorías ordenadas de mayor a menor monto como
+   barras horizontales.
+
+**Flujos alternativos / casos borde**
+
+- Solo se muestran categorías con monto mayor a `$0` dentro del periodo; si ninguna categoría del
+  grupo tuvo actividad, la card de ese grupo muestra un estado vacío en vez de barras.
+- La cuadrícula de cards no crece en alto de forma ilimitada — el contenedor tiene una altura fija
+  con scroll vertical propio (RN-269), para que la pantalla no se alargue con la cantidad de grupos
+  del usuario.
+
+**Precondiciones**
+
+- El usuario debe estar autenticado.
+
+**Postcondiciones**
+
+- Ninguna — caso de uso de solo lectura.
+
+**Definición detallada de campos**
+
+_Comparte los mismos parámetros de periodo que CU-069 — ver esa tabla._
+
+**Reglas de negocio**
+
+- RN-267: Se muestra una card por cada grupo de categorías `status = active` del usuario —
+  `flujo = inflow`, `outflow` e `investment` por igual (a diferencia de RN-090 de [[reportes]],
+  retirado, que excluía los grupos Inflow del ranking de gasto — aquí no hay tal exclusión, todos
+  los grupos se muestran).
+- RN-268: Dentro de cada card, solo se muestran las categorías con monto mayor a `$0` en el periodo
+  seleccionado, ordenadas de mayor a menor. Si ninguna categoría del grupo tiene actividad, se
+  muestra un estado vacío en la card.
+- RN-269: La cuadrícula de cards se presenta en un contenedor de altura fija con scroll vertical
+  propio, en vez de crecer en alto según la cantidad de grupos — decisión de presentación en
+  frontend, sin impacto en el modelo de datos (mismo criterio que RN-228 de Balance para el estilo
+  de carrusel).
+
+**Casos de uso derivados identificados**
+
+- Ninguno adicional.
+
+**Validaciones**
+
+_Comparte las mismas validaciones de periodo que CU-069._
+
+**Mensajes de error**
+
+*Autenticación / autorización*
+- `AUTH_001`: "Tu sesión ha expirado. Inicia sesión nuevamente." *(reutilizado)*
+
+*Sistema*
+- `SYS_001`: "Ocurrió un error inesperado. Intenta de nuevo más tarde." *(reutilizado)*
+
+**Requerimientos técnicos backend**
+
+*Definición del servicio*
+
+| Método | Endpoint | Auth |
+|---|---|---|
+| GET | `/api/v1/dashboard/analytics-category-distribution?periodo={periodo}&fecha_inicio={fecha_inicio}&fecha_fin={fecha_fin}` | Bearer JWT |
+
+*Request*
+```json
+{}
+```
+
+*Response (éxito)* — categorías ya vienen ordenadas por RN-268:
+```json
+{
+  "grupos": [
+    {
+      "grupo_id": "665f...g01",
+      "nombre": "Bills",
+      "flujo": "outflow",
+      "color": "#EF4444",
+      "categorias": [
+        { "categoria_id": "665f...c01", "nombre": "Rent", "monto": 1200.00 },
+        { "categoria_id": "665f...c02", "nombre": "Electricity", "monto": 340.50 }
+      ]
+    }
+  ]
+}
+```
+
+*Modelo de información*
+
+No introduce colección nueva — consulta agregada sobre `transactions` y `categories`.
+
+*Decisiones de modelado*
+
+| Relación | Patrón | Justificación |
+|---|---|---|
+| Agregación en tiempo de consulta | Cálculo derivado, no persistido | Mismo patrón que CU-069/CU-070 |
+
+**Matriz de pruebas**
+
+| # | Categoría | Escenario | Input | Resultado esperado | HTTP |
+|---|---|---|---|---|---|
+| 1 | Flujo exitoso | Usuario con movimientos en varios grupos | — | Una card por grupo, categorías ordenadas por RN-268 | 200 |
+| 2 | Lógica de negocio | Grupo sin actividad en el periodo | — | Estado vacío en esa card | 200 |
+| 3 | Lógica de negocio | Grupo `flujo = inflow` | — | Sí aparece (RN-267, a diferencia del viejo RN-090) | 200 |
+| 4 | Autenticación / autorización | Token expirado o ausente | Sin JWT válido | `AUTH_001` | 401 |
+| 5 | Error del sistema | Falla de base de datos | Simulado | `SYS_001` | 500 |
+
+**Referencia de diseño**
+
+- Pantalla / flujo: Figma — [Analytics tab](https://www.figma.com/design/McS1WiO2R2Z8sKpJBfkOx6/Finanzas-App---Artes?node-id=64-303) (cuadrícula de barras horizontales)
+
+---
+
 ## Historial de cambios
 
 | Fecha | Cambio | CU afectado | Impacto en otros documentos |
 |---|---|---|---|
 | 2026-08-26 | Se documenta la pestaña Balance del módulo Dashboard: balance total + cards de cuentas débito/efectivo (imagen, orden, carrusel), evolución mensual de balance (año navegable limitado a años con datos), resumen de tarjetas de crédito (utilización, disponible, orden, carrusel) con el indicador de gasto mínimo recalculado por ciclo de corte en vez de mes calendario, y evolución mensual de gasto por tarjeta. Se agregan CU-061 a CU-064, RN-225 a RN-241 (incluye RN-241, total de tarjetas de crédito, agregada durante la construcción en código). No se crean colecciones ni campos nuevos — agregación en tiempo de consulta sobre `accounts` y `transactions`, reutilizando `accounts.dia_corte` (ya existente desde [[cuentas]]) para el cálculo del ciclo de corte. Networth y Analytics quedan pendientes de documentar. Aprovechando esta revisión, se detectó y corrige una inconsistencia de formato en toda la plataforma (no específica de este módulo): montos siempre a 2 decimales, porcentajes a 1 decimal salvo que sea `.0`, en cuyo caso se muestra sin decimales — ver commit correspondiente. | CU-061, CU-062, CU-063, CU-064 | Se actualiza [[data-model-registry]] con el índice de numeración (hasta CU-064 / RN-240) y una nota de sucesión funcional sobre [[reportes]] — sin nuevas colecciones que registrar. |
+| 2026-08-26 | Se documenta la pestaña Networth del módulo Dashboard — territorio nuevo, no sucede a ningún CU de [[reportes]]. Se agregan CU-065 a CU-068: desglose de Cash & Savings/Investments/Liabilities, histórico de Networth total con selector de periodo, comparativo Assets vs Liabilities, y meta de Networth configurable. Se introduce la tabla `networth_goals`. Analytics queda pendiente. | CU-065, CU-066, CU-067, CU-068 | Se actualiza [[data-model-registry]] con el índice de numeración (hasta CU-068 / RN-256 / VALIDATION_037), la tabla `networth_goals`, sus relaciones y el diagrama ER — ver el detalle completo en el historial de [[data-model-registry]]. |
+| 2026-08-28 | Se documenta la pestaña Analytics del módulo Dashboard, la última del alcance completo: cuatro cards de resumen (Income, Expenses, Savings, Investment) con comparativo contra el periodo anterior equivalente, gráfica de Cash Flow (Income vs Expenses, granularidad siempre mensual) y una card de barras horizontales por cada grupo de categorías del usuario. Se agregan CU-069 a CU-071, RN-257 a RN-269. **Cambio previo, disparado por esta pestaña:** `categories.flujo` gana un tercer valor estructural, `investment` (antes un subconjunto de Outflow distinguido por nombre exacto) — ver changelog de [[categorias]] del mismo día. Con esto, Expenses e Investment nunca se traslapan sin depender de un nombre de grupo. Suceden funcionalmente a CU-027, CU-028 y CU-030 de [[reportes]] (resumen por grupo, distribución de gasto por categoría, ingresos vs. gastos) — CU-031 (frecuencia de transacciones) no se retoma, queda en [[backlog]]. Los números `CU-023`–`CU-031`/`RN-076`–`RN-097` de [[reportes]] no se reutilizan ni se renumeran. No se crean colecciones nuevas — 100% agregación en tiempo de consulta sobre `transactions`, `categories` y `savings_goals`. Con esta pestaña se completa la construcción en código de todo el alcance definido del producto. | CU-069, CU-070, CU-071 | Se actualiza [[data-model-registry]] con el índice de numeración (hasta CU-071 / RN-269) y la nota de sucesión final sobre [[reportes]]. |
 
 ## Referencias
 
@@ -1185,4 +1600,9 @@ Introduce la tabla nueva `networth_goals` — ver detalle en [[data-model-regist
 - [[data-model-registry]]
 - [[cuentas]]
 - [[transacciones]]
+- [[categorias]]
+- [[presupuesto]]
+- [[ahorros-y-metas]]
+- [[inversiones]]
+- [[creditos-deudas]]
 - [[reportes]]

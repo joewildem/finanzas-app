@@ -445,7 +445,8 @@ ninguna meta ni a ninguna deuda.
    "Debts".
 5. El sistema calcula el "Total por asignar" del mes: ingreso presupuestado (grupos con
    `flujo = inflow`, ver RN-118 en [[categorias]]) menos la suma del presupuesto de los grupos con
-   `flujo = outflow`, de todas las metas activas y de todas las deudas activas.
+   `flujo = outflow`, de los grupos con `flujo = investment`, de todas las metas activas y de todas
+   las deudas activas.
 6. El sistema muestra el resumen completo al usuario.
 
 **Flujos alternativos / casos borde**
@@ -488,12 +489,16 @@ ninguna meta ni a ninguna deuda.
   monto presupuestado, sin poder calcular real al no existir movimientos reales ligados a él.
 - RN-075: el "Total por asignar" del mes se calcula como el ingreso presupuestado (suma de
   `budgets.monto` de las categorías de grupos con `flujo = inflow`, RN-118 en [[categorias]]) menos
-  la suma del presupuesto de las categorías de grupos con `flujo = outflow`, de todas las metas
-  activas presupuestadas y de todas las deudas activas presupuestadas. *Revisado 2026-08-24, cierre
-  de [[creditos-deudas]]: se agrega la resta de deudas presupuestadas, antes ausente por no existir
-  el módulo.*
+  la suma del presupuesto de las categorías de grupos con `flujo = outflow`, de las categorías de
+  grupos con `flujo = investment`, de todas las metas activas presupuestadas y de todas las deudas
+  activas presupuestadas. *Revisado 2026-08-24, cierre de [[creditos-deudas]]: se agrega la resta de
+  deudas presupuestadas, antes ausente por no existir el módulo.* **Revisado 2026-08-28** (al alinear
+  Analytics de [[dashboard]]): `investment` se separa de `outflow` como tercer valor de `flujo` (ver
+  RN-118 en [[categorias]]) — la tabla "Investment" de Budget es nueva, paralela a Inflow/Outflow, y
+  su presupuesto también se resta del total por asignar. El resultado numérico no cambia para el
+  catálogo semilla actual (el grupo Investment ya restaba antes, como parte de Outflow).
 - RN-112: El chip visual de "Available" a nivel categoría se llena en proporción a `real ÷ presupuestado` (capado visualmente en 100%), y solo empieza a llenarse una vez que existe algún movimiento real — con `real = $0` el chip no tiene relleno (RN-116).
-- RN-113: Si `real > presupuestado` en una categoría de un grupo Outflow, el chip cambia a color de alerta (rojo) y el número se muestra en negativo (`presupuestado − real`).
+- RN-113: Si `real > presupuestado` en una categoría de un grupo Outflow o Investment, el chip cambia a color de alerta (rojo) y el número se muestra en negativo (`presupuestado − real`). *Revisado 2026-08-28: Investment sigue el mismo criterio que Outflow — ambas tablas se renderizan con `isIncome=false`.*
 - RN-114: Si `real > presupuestado` en una categoría de un grupo Inflow, el chip cambia a color de éxito (verde) — recibir más de lo esperado es una señal positiva, no negativa — y, a diferencia de RN-113, el número también se muestra en positivo: el excedente recibido (`real − presupuestado`), no el cálculo negativo de "disponible".
 - RN-115: El chip de relleno aplica a nivel categoría, meta y deuda — las tres tienen "real"
   calculado. A nivel grupo (y en los totales de "Goals" y "Debts"), "Available" se muestra solo como
@@ -501,7 +506,7 @@ ninguna meta ni a ninguna deuda.
   de [[creditos-deudas]]: el chip de una deuda sigue el mismo criterio que una categoría de un grupo
   Outflow (RN-113) — pagar más de lo presupuestado en el mes es una señal de alerta, no de éxito.*
 - RN-116: Mientras una categoría presupuestada no tenga ningún movimiento real ese mes (`real = $0`), su chip de "Available" se muestra en color neutro (gris), sin relleno, con el número igual al presupuestado — distingue visualmente "todavía sin actividad" de "dentro del presupuesto, ya con actividad" (ámbar, RN-112).
-- RN-117: Una categoría sin monto asignado (`presupuestado = $0`) pero con movimientos reales ese mes no se trata como "sin datos" — el chip se muestra igual que un sobregasto/sobre-cumplimiento (RN-113/RN-114): rojo con el real en negativo para una categoría de un grupo Outflow, verde con el real en positivo para una categoría de un grupo Inflow, relleno al 100%. Solo cuando tanto el presupuestado como el real están en $0 el chip no se muestra (`—`, RN-115 a nivel grupo aplica el mismo criterio de fondo).
+- RN-117: Una categoría sin monto asignado (`presupuestado = $0`) pero con movimientos reales ese mes no se trata como "sin datos" — el chip se muestra igual que un sobregasto/sobre-cumplimiento (RN-113/RN-114): rojo con el real en negativo para una categoría de un grupo Outflow o Investment, verde con el real en positivo para una categoría de un grupo Inflow, relleno al 100%. Solo cuando tanto el presupuestado como el real están en $0 el chip no se muestra (`—`, RN-115 a nivel grupo aplica el mismo criterio de fondo).
 
 **Casos de uso derivados identificados**
 
@@ -594,7 +599,7 @@ de `transactions` (definido en [[transacciones]]) y `{ meta_id: 1, fecha: -1 }` 
 
 **Referencia de diseño**
 
-- Pantalla / flujo: [[wireframe-presupuesto-mensual]] (tabla estilo YNAB, agrupada y colapsable; chip de relleno en "Available" a nivel categoría según RN-112 a RN-117; gris sin actividad, ámbar dentro de presupuesto, rojo en sobregasto de Outflow, verde con número positivo en sobre-cumplimiento de Inflow — incluye el caso de categoría sin monto asignado pero con real, RN-117). Qué grupo aparece en la tabla Inflow vs. Outflow, y en qué orden dentro de cada una, se decide por `categories.flujo`/`categories.orden` (RN-118/RN-119 en [[categorias]]) — ya no por una lista fija de nombres de grupo.
+- Pantalla / flujo: [[wireframe-presupuesto-mensual]] (tabla estilo YNAB, agrupada y colapsable; chip de relleno en "Available" a nivel categoría según RN-112 a RN-117; gris sin actividad, ámbar dentro de presupuesto, rojo en sobregasto de Outflow, verde con número positivo en sobre-cumplimiento de Inflow — incluye el caso de categoría sin monto asignado pero con real, RN-117). Qué grupo aparece en la tabla Inflow, Outflow o Investment, y en qué orden dentro de cada una, se decide por `categories.flujo`/`categories.orden` (RN-118/RN-119 en [[categorias]]) — ya no por una lista fija de nombres de grupo.
 
 ---
 
@@ -610,6 +615,7 @@ de `transactions` (definido en [[transacciones]]) y `{ meta_id: 1, fecha: -1 }` 
 | 2026-08-11 | Cambio cruzado desde [[categorias]] (RN-118, RN-119): las tablas Inflow/Outflow ya no identifican sus grupos por nombre exacto ("Income" para Inflow; Bills/Needs/Wants/Investment para Outflow) sino por el campo estructural `flujo` de `categories` — un grupo renombrado ya no pierde su clasificación (bug reportado que motivó el cambio). El orden de los grupos dentro de cada tabla, antes fijo y hardcodeado para Outflow, ahora sigue `categories.orden` (reordenable desde [[categorias]], CU-009). Se revisan RN-075 (referencia a "grupo Ingresos" → grupos con `flujo = inflow`/`outflow`), RN-113/RN-114 ("categoría de gasto"/"grupo Ingresos" → "categoría de un grupo Outflow"/"Inflow") y RN-117, sin cambio de comportamiento para el catálogo semilla actual. `src/pages/budget/budget-page.tsx` reemplaza `INCOME_GROUP_NAME`/`OUTFLOW_GROUP_ORDER` por un filtro sobre `group.flujo`. | CU-019, CU-022 | Se actualiza [[data-model-registry]]: índice de numeración hasta `RN-119` (origen categorías) |
 | 2026-08-22 | Cambio cruzado desde [[ahorros-y-metas]]: se **retira** el pseudo-registro único de Ahorros — `budgets.categoria_reservada`, junto con `RN-070` (revisada, ya no describe un pseudo-registro sino `meta_id`) y `VALIDATION_019` (retirado) — reemplazado por `budgets.meta_id`, un renglón presupuestable por cada meta activa, igual que una categoría real. **`RN-074` queda retirada**: ya no es cierto que Ahorros nunca calcule "real" — cada meta activa ahora tiene su propio "real" mensual (RN-151 de [[ahorros-y-metas]]), calculado a partir de sus movimientos `aportacion_meta`/`retiro_meta` del mes (`monto_inicial` no participa, al ser un acumulado histórico). Se revisan CU-019 (campo `meta_id`, `BIZ_023` reutilizado), CU-020 (la copia incluye metas presupuestadas, excluye las archivadas) y CU-022 (RN-075, RN-115, ejemplo de respuesta) para reflejar el cambio. En frontend, `BudgetTable` reemplaza el antiguo `savingsRow` (objeto único, solo `Assigned`, sin `Current`/`Available`) por un prop `goals` — renderizado como un grupo colapsable más, con `Current`/`Available`/chip reales por meta, vía el nuevo hook `use-monthly-goal-actuals.ts`. | CU-019, CU-020, CU-022 | Se actualiza [[data-model-registry]]: `budgets.meta_id`, retiro de `categoria_reservada`/`RN-070`/`VALIDATION_019`/su índice, índice de numeración sin cambio (los códigos nuevos se acuñaron en [[ahorros-y-metas]]) |
 | 2026-08-24 | Cambio cruzado desde [[creditos-deudas]]: la nota original "Deudas queda fuera de este módulo" queda desactualizada — se agrega `budgets.deuda_id` (mutuamente excluyente con `category_id`/`meta_id`), un renglón presupuestable por cada deuda activa, igual que cada meta. Se agrega **RN-222** (patrón de upsert/eliminación de `deuda_id`, mismo criterio que `meta_id`) y **RN-223** (el "real" mensual de una deuda suma capital + interés de sus pagos del mes, a diferencia de `saldo_actual` de la deuda que solo resta capital). Se revisan RN-070, RN-071, RN-075, RN-115 (chip de una deuda sigue el criterio de sobregasto, no de sobre-cumplimiento) y CU-019/CU-020/CU-022 (campo `deuda_id`, `BIZ_031` reutilizado, encabezado "Debts" junto a "Goals") para reflejar el cambio. | CU-019, CU-020, CU-022 | Se actualiza [[data-model-registry]]: `budgets.deuda_id`, su índice único parcial, índice de numeración sin cambio (los códigos nuevos se acuñaron en [[creditos-deudas]]) |
+| 2026-08-28 | Cambio cruzado desde [[categorias]] (RN-118 revisada): `investment` se separa de `outflow` como tercer valor de `categories.flujo`, al alinear Analytics de [[dashboard]]. Budget gana una tercera tabla, "Investment", paralela a Inflow/Outflow — mismo componente `BudgetTable` reutilizado (`isIncome=false`, sin `goals`/`debts`), filtrado por `group.flujo === 'investment'`. Se revisan RN-075 (el total por asignar también resta el presupuesto de Investment), RN-113/RN-117 (Investment sigue el criterio de alerta de Outflow, no el de éxito de Inflow). Sin cambio numérico para el catálogo semilla actual — el grupo Investment ya restaba del total por asignar antes, como parte de Outflow. | CU-019, CU-022 | Se actualiza [[data-model-registry]]: enum `category_flow` con `investment` (origen [[categorias]]), sin cambio de numeración |
 
 ## Referencias
 

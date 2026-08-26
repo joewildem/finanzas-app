@@ -133,9 +133,9 @@ export function AddTransactionDialog({
 
   // CU-017 — reconstruye el estado del formulario a partir de la transacción a editar. El chip
   // "Investment" no es un `tipo` propio en la base de datos (reutiliza `gasto`, RN-039) así que se
-  // infiere buscando a qué grupo pertenece la categoría ya asignada. Para transferencia/pago a
-  // tarjeta, la fila clickeada solo trae su propio lado — se resuelve el otro consultando el
-  // documento enlazado, únicamente para mostrarlo (ambos quedan de solo lectura).
+  // infiere buscando a qué grupo pertenece la categoría ya asignada (`flujo = 'investment'`). Para
+  // transferencia/pago a tarjeta, la fila clickeada solo trae su propio lado — se resuelve el otro
+  // consultando el documento enlazado, únicamente para mostrarlo (ambos quedan de solo lectura).
   async function populateFromTransaction(tx: TransactionWithRelations) {
     let derivedChip: MovementChip = 'expense'
     if (tx.tipo === 'ingreso') derivedChip = 'income'
@@ -146,7 +146,7 @@ export function AddTransactionDialog({
     else if (tx.tipo === 'pago_deuda') derivedChip = 'debt_payment'
     else {
       const groupEntry = (groups ?? []).find((entry) => entry.categories.some((c) => c.id === tx.category_id))
-      derivedChip = groupEntry?.group.nombre === 'Investment' ? 'investment' : 'expense'
+      derivedChip = groupEntry?.group.flujo === 'investment' ? 'investment' : 'expense'
     }
 
     setChip(derivedChip)
@@ -203,16 +203,15 @@ export function AddTransactionDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editingTransaction, initialChip, initialGoalId])
 
-  // RN-039/RN-118 — el grupo permitido para gasto/ingreso se decide por `flujo`, no por nombre. El
-  // chip "Investment" sigue siendo un caso especial por nombre de grupo (subconjunto de Outflow),
-  // fuera del alcance del flujo Inflow/Outflow.
+  // RN-039/RN-118 — el grupo permitido para gasto/ingreso/investment se decide por `flujo`,
+  // estructural desde que 'investment' se agregó como tercer valor del enum (ya no por nombre de
+  // grupo — ver changelog de categorias.md).
   const filteredGroups = useMemo(
     () =>
-      (groups ?? []).filter((entry) =>
-        chip === 'investment'
-          ? entry.group.nombre === 'Investment'
-          : entry.group.flujo === (chip === 'income' ? 'inflow' : 'outflow'),
-      ),
+      (groups ?? []).filter((entry) => {
+        if (chip === 'investment') return entry.group.flujo === 'investment'
+        return entry.group.flujo === (chip === 'income' ? 'inflow' : 'outflow')
+      }),
     [groups, chip],
   )
 
