@@ -4,6 +4,7 @@ import { EmptyState } from '@/components/empty-state'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BalanceTab } from '@/pages/dashboard/balance-tab'
+import { NetworthTab } from '@/pages/dashboard/networth-tab'
 
 // Módulo Dashboard (docs/pdr/dashboard.md) — tres pestañas: Balance (CU-061 a CU-064, construida),
 // Networth y Analytics (pendientes de documentar y construir).
@@ -29,15 +30,7 @@ export function DashboardPage() {
         </TabsContent>
 
         <TabsContent value="networth">
-          <Card>
-            <CardContent className="flex min-h-64 flex-col">
-              <EmptyState
-                icon={ChartLineIcon}
-                title="Networth is coming soon"
-                description="Net worth tracking is planned for a future release."
-              />
-            </CardContent>
-          </Card>
+          <NetworthTab />
         </TabsContent>
 
         <TabsContent value="analytics">

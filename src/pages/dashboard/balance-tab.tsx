@@ -68,7 +68,7 @@ export function BalanceTab() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <p className="text-base font-medium text-muted-foreground">Total balance</p>
-        <p className="font-mono text-4xl font-medium text-card-foreground">{formatCurrency(balanceTotal)}</p>
+        <p className="font-mono text-2xl font-regular text-card-foreground">{formatCurrency(balanceTotal)}</p>
       </div>
 
       {debitoEfectivo.length === 0 ? (
@@ -100,7 +100,7 @@ export function BalanceTab() {
 
       <div className="flex flex-col gap-2">
         <p className="text-base font-medium text-muted-foreground">Total credit cards</p>
-        <p className="font-mono text-4xl font-medium text-card-foreground">{formatCurrency(totalCreditCards)}</p>
+        <p className="font-mono text-2xl font-regular text-card-foreground">{formatCurrency(totalCreditCards)}</p>
       </div>
 
       {credito.length === 0 ? (

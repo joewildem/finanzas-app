@@ -18,9 +18,9 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 
 |Contador|Último usado|Módulo de origen|
 |---|---|---|
-|Casos de uso (CU-XXX)|CU-064|dashboard|
-|Reglas de negocio (RN-XXX)|RN-241|dashboard|
-|Errores de validación (VALIDATION_XXX)|VALIDATION_035|creditos-deudas|
+|Casos de uso (CU-XXX)|CU-068|dashboard|
+|Reglas de negocio (RN-XXX)|RN-256|dashboard|
+|Errores de validación (VALIDATION_XXX)|VALIDATION_037|dashboard|
 |Errores de autenticación/autorización (AUTH_XXX)|AUTH_003|auth|
 |Errores de lógica de negocio (BIZ_XXX)|BIZ_033|creditos-deudas|
 |Errores de sistema (SYS_XXX)|SYS_001|cuentas|
@@ -38,6 +38,8 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 > Nota: `docs/pdr/inversiones.md` (CU-042 a CU-047, RN-140 a RN-181, `VALIDATION_026`–`VALIDATION_031`, `BIZ_026`–`BIZ_029`) se había numerado — y este índice se había editado en consecuencia — sin partir del máximo real dejado por el cierre de Ahorros y Metas (CU-048, RN-152, `VALIDATION_026`, `BIZ_026`), colisionando enteramente con él. Detectado el 2026-08-23 al iniciar la construcción del módulo Inversiones; se renumeró el documento completo a `CU-049`–`CU-054`, `RN-153`–`RN-194`, `VALIDATION_027`–`VALIDATION_032`, `BIZ_027`–`BIZ_030` (detalle de la equivalencia en el historial de cambios de [[inversiones]]) y se corrigió este índice. Ningún otro documento cambió sus propios números.
 
 > Nota (2026-08-26): `docs/pdr/dashboard.md` (pestaña Balance, CU-061 a CU-064, RN-225 a RN-240) sucede funcionalmente a `docs/pdr/reportes.md` (CU-023, CU-024, CU-025 — balance total, evolución mensual débito/efectivo, resumen de tarjetas de crédito), con reglas de negocio nuevas o corregidas (orden explícito de cards, carrusel, años navegables limitados a los que tienen datos, y el indicador de gasto mínimo mensual recalculado por ciclo de corte de la tarjeta en vez de mes calendario). Los números `CU-023`–`CU-031` y `RN-076`–`RN-097` de [[reportes]] **no se reutilizan ni se renumeran** — quedan como registro histórico de un módulo cuya navegación se retiró de la aplicación sin construirse en su forma original. El resto de [[reportes]] (pestaña Reporte Mensual: CU-027, CU-028, CU-030, CU-031) queda pendiente de resolución cuando se documente la pestaña Analytics de Dashboard.
+
+> Nota (2026-08-26): `docs/pdr/dashboard.md` (pestaña Networth, CU-065 a CU-068, RN-242 a RN-256) no sucede a ningún CU de [[reportes]] — es territorio nuevo, [[reportes]] nunca cubrió patrimonio neto. Introduce la primera tabla nueva del módulo Dashboard, `networth_goals` (meta de Networth configurable, un registro por usuario). El resto es agregación en tiempo de consulta sobre `accounts`, `savings_goals`, `investments`, `investment_balance_history`, `debts` y `transactions` — generaliza a estas cuatro fuentes la reconstrucción histórica ya usada en Balance (RN-230) para poder graficar el Networth total a lo largo del tiempo.
 
 ## Colecciones
 
@@ -383,6 +385,32 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |`(user_id, status)`|B-tree compuesto|Listar deudas activas/archivadas de un usuario|CU-055; reutilizado en CU-056|
 |`(user_id, nombre)` `WHERE status = 'active'`|Único parcial|Garantizar unicidad del nombre solo entre deudas activas (RN-195)|CU-055; reutilizado en CU-058|
 
+### `networth_goals`
+
+> Tabla nueva, introducida por [[dashboard]] (pestaña Networth). Almacena un único monto objetivo
+> de Networth por usuario — sin historial de metas anteriores, a diferencia de `savings_goals` o
+> `debts`, que sí acumulan movimientos a lo largo del tiempo. `user_id` es la primary key (no hay
+> `id` propio): cambiar la meta es un upsert directo sobre la única fila del usuario.
+
+```json
+{
+  "user_id": "uuid"
+}
+```
+
+|Campo|Tipo|Requerido|Default|Procedencia (CU)|
+|---|---|---|---|---|
+|`user_id`|uuid (FK → users.id, primary key)|Sí|—|CU-068|
+|`monto_objetivo`|numeric(14,2)|Sí|—|CU-068 (RN-254); editable, se sobreescribe (upsert)|
+|`created_at`|timestamptz|Sí|`now()`|CU-068|
+|`updated_at`|timestamptz|Sí|`now()`|CU-068; se actualiza en cada cambio de meta|
+
+> Política RLS: `auth.uid() = user_id`.
+
+**Índices**
+
+`user_id` ya es primary key — no requiere índice adicional.
+
 ## Relaciones
 
 |Relación|Patrón (embebido / referenciado)|Cardinalidad|Justificación|Procedencia (CU)|
@@ -405,12 +433,18 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |`debts.user_id` → `users`|Referenciado (FK)|1:N|Igual que `accounts.user_id`|CU-055|
 |`transactions.deuda_id` → `debts`|Referenciado (FK), nullable|1:N (una deuda, varios pagos)|Un pago pertenece a una deuda; mutuamente excluyente con `category_id` y `meta_id`|CU-060|
 |`budgets.deuda_id` → `debts`|Referenciado (FK), nullable|1:N (una deuda, varios presupuestos mensuales)|Un presupuesto de deuda siempre referencia una deuda existente; mutuamente excluyente con `category_id` y `meta_id`|CU-055/CU-060|
+|`networth_goals.user_id` → `users`|Referenciado (FK, primary key)|1:1 (un usuario, una meta)|A diferencia del resto de las tablas de usuario (1:N), la meta de Networth es un único valor sin historial — `user_id` es la propia primary key|CU-068|
 
 > [[inversiones]] (CU-042 a CU-047) **no agrega relaciones hacia `categories`, `transactions` ni `budgets`**, por decisión explícita. `grupo_activo` y `tipo_activo` se modelan como enums propios y no como FK a `categories`, porque son dos taxonomías **ortogonales** (un instrumento tiene grupo _y_ tipo, independientes entre sí), incompatibles con la jerarquía de un nivel grupo→categoría; además, `categories` clasifica transacciones y reutilizarla contaminaría el selector de categorías al capturar un gasto. Tampoco se agrega `budgets.investment_id` (el grupo "Investment" ya se presupuesta con categorías reales, y un tercer campo mutuamente excluyente con `category_id` y `meta_id` duplicaría un mecanismo existente) ni `transactions.investment_id` (habilitaría costo promedio y rendimiento, alcance deliberadamente delegado a Yahoo Finance). Ambas quedan registradas en [[backlog]] como posibles extensiones futuras.
 
 > [[creditos-deudas]] (CU-055 a CU-060), a diferencia de [[inversiones]], **sí agrega relaciones hacia `transactions` y `budgets`** — sigue el mismo patrón ya establecido por `savings_goals` en [[ahorros-y-metas]] (documento único vía `deuda_id`, renglón presupuestable propio vía `budgets.deuda_id`) en vez del patrón "capturado manualmente, sin relaciones" de `investments`. No se agrega relación hacia `categories`: `debts.tipo` es un enum cerrado propio (auto/hipoteca/personal/otro), no una taxonomía que deba vivir en el sistema de categorías de gasto.
 
 > [[reportes]] (CU-023 a CU-031) no agrega relaciones nuevas — consulta `accounts`, `categories`, `transactions` y `budgets` mediante agregación en tiempo de consulta, sin persistir ningún dato derivado (balance histórico, distribución por grupo, frecuencia de transacciones, etc.). Esto queda pendiente de revisión cuando [[reportes]] incorpore el detalle de metas individuales.
+
+> [[dashboard]] (pestaña Networth, CU-065 a CU-068) agrega una única relación nueva —
+> `networth_goals.user_id → users`— y, por lo demás, solo **lee** `accounts`, `savings_goals`,
+> `investments`, `investment_balance_history`, `debts` y `transactions` mediante agregación en
+> tiempo de consulta, sin relaciones nuevas hacia ninguna de ellas.
 
 ## Diagrama entity-relationship
 
@@ -423,6 +457,7 @@ erDiagram
     USERS ||--o{ SAVINGS_GOALS : "posee"
     USERS ||--o{ INVESTMENTS : "posee"
     USERS ||--o{ DEBTS : "posee"
+    USERS ||--o| NETWORTH_GOALS : "configura"
     ACCOUNTS ||--o{ TRANSACTIONS : "tiene"
     CATEGORIES ||--o{ CATEGORIES : "agrupa"
     CATEGORIES ||--o{ TRANSACTIONS : "clasifica"
@@ -518,9 +553,13 @@ erDiagram
         date fecha_liquidacion_estimada
         text status
     }
+    NETWORTH_GOALS {
+        uuid user_id
+        numeric monto_objetivo
+    }
 ```
 
-_(se agrega la entidad `USERS` tras el cierre de [[auth]], resolviendo las cuatro relaciones que quedaban pendientes desde el primer módulo. Se agrega la entidad `SAVINGS_GOALS` tras el cierre de [[ahorros-y-metas]]; `BUDGETS.categoria_reservada` fue reemplazado por `BUDGETS.meta_id` en el mismo cierre. Desde el 2026-08-22, todo el diagrama usa tipos Postgres nativos — ya no hay mezcla de notación Mongo/Postgres. Se agregan las entidades `INVESTMENTS` e `INVESTMENT_BALANCE_HISTORY` tras el cierre de [[inversiones]]: nótese que **`INVESTMENTS` solo se relaciona con `USERS` y con su propio histórico** — no toca `CATEGORIES`, `TRANSACTIONS` ni `BUDGETS`, por decisión explícita documentada en la sección de Relaciones. Se agrega la entidad `DEBTS` tras el cierre de [[creditos-deudas]], la última fase de Casos de uso y Requerimientos del alcance completo: a diferencia de `INVESTMENTS`, `DEBTS` sí se relaciona con `TRANSACTIONS` (vía `deuda_id`, mismo patrón de documento único que `SAVINGS_GOALS`) y con `BUDGETS` (vía `deuda_id`, un renglón presupuestable por deuda activa).)_
+_(se agrega la entidad `USERS` tras el cierre de [[auth]], resolviendo las cuatro relaciones que quedaban pendientes desde el primer módulo. Se agrega la entidad `SAVINGS_GOALS` tras el cierre de [[ahorros-y-metas]]; `BUDGETS.categoria_reservada` fue reemplazado por `BUDGETS.meta_id` en el mismo cierre. Desde el 2026-08-22, todo el diagrama usa tipos Postgres nativos — ya no hay mezcla de notación Mongo/Postgres. Se agregan las entidades `INVESTMENTS` e `INVESTMENT_BALANCE_HISTORY` tras el cierre de [[inversiones]]: nótese que **`INVESTMENTS` solo se relaciona con `USERS` y con su propio histórico** — no toca `CATEGORIES`, `TRANSACTIONS` ni `BUDGETS`, por decisión explícita documentada en la sección de Relaciones. Se agrega la entidad `DEBTS` tras el cierre de [[creditos-deudas]], la última fase de Casos de uso y Requerimientos del alcance completo: a diferencia de `INVESTMENTS`, `DEBTS` sí se relaciona con `TRANSACTIONS` (vía `deuda_id`, mismo patrón de documento único que `SAVINGS_GOALS`) y con `BUDGETS` (vía `deuda_id`, un renglón presupuestable por deuda activa). Se agrega la entidad `NETWORTH_GOALS` tras documentarse la pestaña Networth de [[dashboard]]: única tabla del registro con relación `1:1` hacia `USERS` (`user_id` es su propia primary key, sin `id` propio) — no se relaciona con ninguna otra entidad.)_
 
 ## Conflictos sin resolver
 
@@ -543,6 +582,7 @@ _(ninguno por ahora. Si un módulo nuevo contradice una definición previa de un
 |2026-08-23|inversiones|Se registran las tablas `investments` (instrumento con ticker único por usuario sin importar estado, nombre, grupo y tipo de activo como enums cerrados, porcentaje objetivo, balance actual y estado `activo`/`inactivo`) e `investment_balance_history` (serie temporal, una fila por instrumento y fecha, sin pantalla propia). Se agregan CU-042 a CU-047. **El módulo no ejecuta ni registra movimientos de dinero**: `balance_actual` es un dato capturado manualmente y no derivado de `transactions` (RN-143), primera vez en el sistema que un monto principal no es reconstruible — el capital que entra al portafolio se sigue registrando como `gasto` del grupo "Investment" en [[transacciones]], y [[reportes]] lo sigue excluyendo del gasto real (RN-094, confirmada sin cambios). Se establece la regla del 100% sobre el conjunto activo (RN-159), con guardado atómico por lote (RN-162, divergencia deliberada respecto al rechazo parcial de CU-019 de [[presupuesto]]), y el algoritmo de distribución de la siguiente aportación en dos fases: cubrir faltantes proporcionalmente y repartir el remanente por porcentaje objetivo (RN-173 a RN-178). El módulo **no** usa el estado `archived` del resto de las tablas — `inactivo` ocupa ese rol y la eliminación es física, solo sobre inactivos (RN-179). **Decisiones explícitas de no-extensión:** no se agrega `budgets.investment_id` (el patrón de presupuesto por ítem de [[ahorros-y-metas]] **no** se extiende a este módulo, porque el grupo "Investment" ya se presupuesta con categorías reales), no se agrega `transactions.investment_id`, y `grupo_activo`/`tipo_activo` no se modelan como FK a `categories` por ser taxonomías ortogonales. Se actualiza la nota de `categories` sobre la reutilización de `grupo_id`, que ahora aplica solo a Créditos y Deudas. Se agregan dos ítems a [[backlog]]: catálogo administrable de grupos/tipos de activo y vínculo transacción ↔ instrumento. Se actualiza el índice de numeración hasta CU-047 / RN-181 / VALIDATION_031 / BIZ_029 (AUTH_003 y SYS_001 sin cambio).|
 |2026-08-24|creditos-deudas|Se registra la tabla `debts` (deuda externa —auto, hipoteca, personal, otro— con nombre único entre deudas activas, monto original editable, tasa de interés informativa, pago mensual esperado, día de pago y fecha estimada de liquidación opcionales, y estado `active`/`archived`). Se agregan CU-055 a CU-060, cerrando la fase de Casos de uso y Requerimientos del alcance completo (los 9 documentos de `docs/pdr/`). **A diferencia de `investments`, el saldo de una deuda sí se deriva de `transactions`** — se extiende el esquema con `deuda_id`, `monto_capital` y `monto_interes` (mutuamente excluyentes con `category_id`/`meta_id`), y se agrega `pago_deuda` al enum `tipo`: un pago se registra como fila única (mismo patrón que `aportacion_meta`/`retiro_meta`), pero el saldo calculado de la deuda solo resta la porción de capital (RN-202, RN-216) — el interés es el costo del financiamiento, no una reducción de lo adeudado. Se extiende `budgets` con `deuda_id`: cada deuda activa gana su propio renglón presupuestable, igual que cada meta de ahorro, con "real" mensual = capital + interés pagado en el mes (RN-223) — a diferencia del saldo de la deuda, que solo cuenta capital. El archivado es siempre manual, sin relación con que el saldo llegue a $0 (RN-204, mismo criterio que RN-137 de [[ahorros-y-metas]]). Se actualiza [[transacciones]] (enum `tipo`, campos nuevos, CU-017 editable) y [[presupuesto]] (`budgets.deuda_id`, RN-070/RN-071/RN-075/RN-115 revisadas, encabezado "Debts"). Se actualiza el índice de numeración hasta CU-060 / RN-224 / VALIDATION_035 / BIZ_033 (AUTH_003 y SYS_001 sin cambio).|
 |2026-08-26|dashboard|Se documenta la pestaña Balance del módulo Dashboard, el módulo consolidado que sucede a [[reportes]] (nav item retirado sin construirse en su forma original). Se agregan CU-061 a CU-064: balance total y cards de cuentas débito/efectivo (imagen configurada, orden explícito por saldo, carrusel de overflow), evolución de balance mensual (año navegable limitado a los que tienen datos), resumen de tarjetas de crédito (utilización, disponible, mismo orden y carrusel) y evolución de gasto mensual por tarjeta. **No se crean colecciones ni campos nuevos** — 100% agregación en tiempo de consulta sobre `accounts` y `transactions`, reutilizando `accounts.dia_corte` (ya existente) para un cálculo nuevo: el indicador de gasto mínimo mensual se recalcula por **ciclo de corte de la tarjeta** en vez de mes calendario, corrigiendo RN-083/RN-084 de [[reportes]]. Los números `CU-023`–`CU-031` de [[reportes]] no se reutilizan ni se renumeran, quedan como registro histórico — el resto de ese módulo (Reporte Mensual) se resuelve cuando se documente la pestaña Analytics de Dashboard. Networth y Analytics quedan pendientes. Se agrega RN-241 (total de tarjetas de crédito, mismo patrón que RN-225) al construirse la pantalla en código. Se actualiza el índice de numeración hasta CU-064 / RN-241 / VALIDATION_035 (sin cambio) / BIZ_033 (sin cambio) / AUTH_003 (sin cambio) / SYS_001 (sin cambio).|
+|2026-08-26|dashboard|Se documenta la pestaña Networth del módulo Dashboard — territorio nuevo, no sucede a ningún CU de [[reportes]]. Se agregan CU-065 a CU-068: resumen de Cash & Savings, Investments y Liabilities agrupados por tipo (metas activas + cuentas débito/efectivo; inversiones activas por `tipo_activo`; tarjetas de crédito + deudas activas por `tipo`); evolución histórica del Networth total con selector de periodo (1M/6M/YTD/1Y/All/Custom), siempre con granularidad mensual, generalizando a cuatro fuentes (cuentas, metas, inversiones, deudas) la reconstrucción "a la fecha" ya usada en Balance (RN-230) — las inversiones usan el snapshot más reciente de `investment_balance_history` anterior o igual a cada punto; comparativo Assets vs Liabilities (snapshot actual, sin historial); y meta de Networth configurable con gauge de avance (tope visual en 100%, porcentaje real sin tope en texto). **Se introduce la primera tabla nueva del módulo Dashboard**, `networth_goals` (un registro por usuario, `user_id` como primary key, sin historial de metas anteriores) — el resto sigue siendo 100% agregación en tiempo de consulta, sin más colecciones ni campos nuevos. Se resuelve explícitamente la ambigüedad de nomenclatura entre "Assets" (concepto amplio: Cash & Savings + Investments, exclusivo del comparativo) y la card "Cash & Savings" (subconjunto): se documenta como nota al inicio de la sección Networth en [[dashboard]]. Se agrega `VALIDATION_036` (rango de fechas inválido en el periodo Custom) y `VALIDATION_037` (meta de Networth ≤ 0). Se actualiza el índice de numeración hasta CU-068 / RN-256 / VALIDATION_037 / BIZ_033 (sin cambio) / AUTH_003 (sin cambio) / SYS_001 (sin cambio), la tabla de Relaciones y el diagrama ER (`NETWORTH_GOALS`, relación 1:1 con `USERS`). Analytics queda pendiente de documentar y construir — es la última pestaña del Dashboard.|
 
 ---
 

@@ -39,7 +39,7 @@ export function CreditBalanceCard({ account, cycleSpend }: { account: Account; c
       <div className="relative flex h-full flex-col p-4">
         <div className="flex flex-1 flex-col justify-center gap-1.5">
           <p className="truncate text-sm font-medium text-white/80">{account.nombre}</p>
-          <p className="font-mono text-3xl font-medium text-white">{formatCurrency(account.saldo_actual)}</p>
+          <p className="font-mono text-2xl font-medium text-white">{formatCurrency(account.saldo_actual)}</p>
         </div>
 
         <div className="flex flex-col gap-2">

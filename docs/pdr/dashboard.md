@@ -16,10 +16,21 @@ sin construirse en su forma original, y su función se absorbe aquí (ver la not
 tres pestañas se documentan y construyen una por una, alineando primero con el usuario en lenguaje
 no técnico antes de formalizar cada una — este documento crece con cada pestaña cerrada.
 
-**Balance** (esta entrega) informa sobre el dinero disponible: balance total y cards de cuentas de
-débito/efectivo, su evolución mensual, y el resumen de tarjetas de crédito (utilización, disponible,
-y avance de gasto contra el mínimo mensual por ciclo de corte) junto con su evolución de gasto
-mensual. **Networth** y **Analytics** quedan pendientes de documentar.
+**Balance** informa sobre el dinero disponible: balance total y cards de cuentas de débito/efectivo,
+su evolución mensual, y el resumen de tarjetas de crédito (utilización, disponible, y avance de
+gasto contra el mínimo mensual por ciclo de corte) junto con su evolución de gasto mensual.
+
+**Networth** (esta entrega) informa sobre el patrimonio neto del usuario: un desglose de Cash &
+Savings, Investments y Liabilities (columna izquierda), la evolución histórica del Networth total
+con selector de periodo (columna derecha), un comparativo Assets vs Liabilities, y una meta de
+Networth configurable con su avance. **Analytics** queda pendiente de documentar.
+
+> **Nota de nomenclatura:** la palabra "Assets" se usa en dos sentidos distintos dentro de esta
+> pestaña, y se documenta explícitamente para evitar confusión al leer las reglas de negocio. La
+> card de la columna izquierda (CU-065) se llama **"Cash & Savings"** — deliberadamente, no
+> "Assets" — y agrupa únicamente metas de ahorro, cuentas de débito y cuentas de efectivo. El
+> componente "Networth balance" (CU-067) sí usa el término **"Assets"**, con un alcance más amplio:
+> Cash & Savings + Investments. Son dos totales distintos por diseño, no una inconsistencia.
 
 > **Nota de sucesión:** CU-061 a CU-064 (Balance) suceden funcionalmente a CU-023, CU-024 y CU-025
 > de [[reportes]] — mismo cálculo base (balance total, evolución mensual débito/efectivo, resumen de
@@ -594,6 +605,570 @@ Reutiliza `(account_id, fecha desc)` de `transactions`.
 **Referencia de diseño**
 
 - Pantalla / flujo: Figma — [Balance tab](https://www.figma.com/design/McS1WiO2R2Z8sKpJBfkOx6/Finanzas-App---Artes?node-id=62-44) (gráfica "Monthly usage")
+
+---
+
+### CU-065 — Consultar resumen de Cash & Savings, Investments y Liabilities
+
+**Actor:** Usuario autenticado (dueño de los datos)
+
+**Descripción del caso de uso**
+
+Esta funcionalidad permitirá al usuario consultar, en la columna izquierda de la pestaña "Networth"
+del Dashboard, tres cards con el resumen de su patrimonio agrupado en **Cash & Savings** (metas de
+ahorro activas, cuentas de débito y cuentas de efectivo), **Investments** (inversiones activas
+agrupadas por tipo de instrumento) y **Liabilities** (tarjetas de crédito y deudas activas
+agrupadas por tipo de deuda). Cada card muestra su total, una barra segmentada proporcional a los
+ítems que la componen, y el detalle de cada ítem.
+
+**Flujo principal**
+
+1. El usuario accede a la pestaña "Networth" del Dashboard.
+2. El sistema calcula el total de Cash & Savings sumando `monto_aportado_actual` de las metas de
+   ahorro activas del usuario, y `saldo_actual` de sus cuentas de débito y efectivo activas con
+   `excluir_de_stats = false`.
+3. El sistema calcula el total de Investments sumando `balance_actual` de las inversiones activas
+   (`status = activo`) del usuario, agrupado por `tipo_activo`.
+4. El sistema calcula el total de Liabilities sumando, en un grupo "Credit Cards", el valor absoluto
+   de `saldo_actual` de las cuentas de crédito activas del usuario; y, en un grupo por cada `tipo`
+   de deuda con al menos una deuda activa, el saldo calculado (`monto_original` menos capital
+   pagado, mismo cálculo que RN-202 de [[creditos-deudas]]) de esas deudas.
+5. El sistema muestra las tres cards, cada una con su total, una barra segmentada proporcional a los
+   ítems que la componen, y el detalle de cada ítem ordenado de mayor a menor monto.
+
+**Flujos alternativos / casos borde**
+
+- Si un grupo no tiene ningún ítem con datos (ej. el usuario no tiene inversiones), la card muestra
+  el total en $0.00 y un estado vacío en lugar de la barra segmentada y el detalle.
+- Las metas archivadas, cuentas archivadas, deudas archivadas e inversiones inactivas nunca
+  participan en estos totales ni aparecen como ítem.
+- Un ítem con monto $0 (ej. una deuda activa ya liquidada pero aún no archivada, RN-204 de
+  [[creditos-deudas]]) sí aparece en el detalle, en su posición correspondiente por orden.
+
+**Precondiciones**
+
+- El usuario debe estar autenticado.
+
+**Postcondiciones**
+
+- Ninguna — caso de uso de solo lectura.
+
+**Definición detallada de campos**
+
+_No aplica — este CU no captura datos, solo consulta información existente._
+
+**Reglas de negocio**
+
+- RN-242: Cash & Savings = Σ `monto_aportado_actual` de `savings_goals` con `status = active` del
+  usuario + Σ `saldo_actual` de `accounts` con `tipo = debito` o `tipo = efectivo`,
+  `status = active` y `excluir_de_stats = false` — mismo criterio de exclusión que RN-225 de
+  Balance, aplicado también aquí por ser un total de "patrimonio en estadísticas".
+- RN-243: Investments = Σ `balance_actual` de `investments` con `status = activo` del usuario,
+  agrupado por `tipo_activo`; solo se muestra un ítem por cada tipo que tenga al menos un
+  instrumento activo.
+- RN-244: Liabilities = ítem "Credit Cards" (Σ `abs(saldo_actual)` de `accounts` con
+  `tipo = credito` y `status = active`) + un ítem por cada `tipo` de `debts` con al menos una deuda
+  activa (Σ del saldo calculado de esas deudas, RN-202 de [[creditos-deudas]]), etiquetado con
+  `DEBT_TYPE_LABELS`.
+- RN-245: Orden de los ítems dentro de cada card: de mayor a menor monto.
+- RN-246: La barra segmentada de cada card representa, para cada ítem, su proporción
+  (`monto_item ÷ total_card`) del ancho total de la barra. Si el total de una card es `0`, no se
+  muestra la barra ni el detalle — se muestra un estado vacío dentro de esa card.
+- RN-247: Las metas archivadas, cuentas archivadas, deudas archivadas e inversiones inactivas nunca
+  participan en estos totales — mismo criterio de "solo activos" ya aplicado en Balance (RN-226,
+  RN-233) y en los listados propios de cada módulo.
+
+**Casos de uso derivados identificados**
+
+- Ninguno — mismo motivo ya evaluado en [[cuentas]] y [[categorias]]: volumen bajo de registros por
+  usuario.
+
+**Validaciones**
+
+_No aplica — sin parámetros de entrada._
+
+**Mensajes de error**
+
+*Autenticación / autorización*
+- `AUTH_001`: "Tu sesión ha expirado. Inicia sesión nuevamente." *(reutilizado)*
+
+*Sistema*
+- `SYS_001`: "Ocurrió un error inesperado. Intenta de nuevo más tarde." *(reutilizado)*
+
+**Requerimientos técnicos backend**
+
+*Definición del servicio*
+
+| Método | Endpoint | Auth |
+|---|---|---|
+| GET | `/api/v1/dashboard/networth-breakdown` | Bearer JWT |
+
+*Request*
+```json
+{}
+```
+
+*Response (éxito)* — `items` de cada grupo ya viene ordenado por RN-245:
+```json
+{
+  "cash_and_savings": {
+    "total": 53005.57,
+    "items": [
+      { "id": "savings", "label": "Savings", "monto": 42014.07 },
+      { "id": "debit_accounts", "label": "Debit Accounts", "monto": 9916.49 },
+      { "id": "cash", "label": "Cash", "monto": 1125.00 }
+    ]
+  },
+  "investments": {
+    "total": 53005.57,
+    "items": [
+      { "id": "ETF", "label": "ETF", "monto": 42014.07 },
+      { "id": "PPR", "label": "PPR", "monto": 9916.49 },
+      { "id": "Crypto", "label": "Crypto", "monto": 1125.00 }
+    ]
+  },
+  "liabilities": {
+    "total": 53005.57,
+    "items": [
+      { "id": "credit_cards", "label": "Credit Cards", "monto": 42014.07 },
+      { "id": "auto", "label": "Auto loan", "monto": 9916.49 },
+      { "id": "hipoteca", "label": "Mortgage", "monto": 1125.00 }
+    ]
+  }
+}
+```
+
+*Modelo de información*
+
+No introduce colección nueva — consulta agregada sobre `accounts`, `savings_goals`, `transactions`,
+`investments` y `debts`.
+
+*Decisiones de modelado*
+
+| Relación | Patrón | Justificación |
+|---|---|---|
+| Agregación en tiempo de consulta | Cálculo derivado, no persistido | Mismo patrón que el resto del Dashboard — ninguno de los tres totales se guarda |
+
+*Índices*
+
+Reutiliza `(user_id, status)` de `accounts`, `savings_goals`, `investments` y `debts`, y
+`(meta_id, fecha desc)`/`(deuda_id, fecha desc)` de `transactions` (todos ya definidos en sus
+módulos de origen).
+
+**Matriz de pruebas**
+
+| # | Categoría | Escenario | Input | Resultado esperado | HTTP |
+|---|---|---|---|---|---|
+| 1 | Flujo exitoso | Usuario con datos en las tres fuentes | — | Tres cards con totales e ítems correctos, orden RN-245 | 200 |
+| 2 | Lógica de negocio | Usuario sin inversiones | — | Card Investments en $0.00, estado vacío | 200 |
+| 3 | Lógica de negocio | Meta de ahorro archivada | — | No participa en Cash & Savings | 200 |
+| 4 | Lógica de negocio | Deuda activa con saldo $0 (liquidada, no archivada) | — | Aparece como ítem en $0.00 | 200 |
+| 5 | Lógica de negocio | Cuenta débito con `excluir_de_stats = true` | — | No participa en Cash & Savings | 200 |
+| 6 | Autenticación / autorización | Token expirado o ausente | Sin JWT válido | `AUTH_001` | 401 |
+| 7 | Error del sistema | Falla de base de datos | Simulado | `SYS_001` | 500 |
+
+**Referencia de diseño**
+
+- Pantalla / flujo: Figma — [Networth tab](https://www.figma.com/design/McS1WiO2R2Z8sKpJBfkOx6/Finanzas-App---Artes?node-id=52-192) (columna izquierda)
+
+---
+
+### CU-066 — Consultar evolución histórica del Networth total
+
+**Actor:** Usuario autenticado (dueño de los datos)
+
+**Descripción del caso de uso**
+
+Esta funcionalidad permitirá al usuario consultar, en la columna derecha de la pestaña "Networth",
+una gráfica de línea con la evolución de su Networth total (Cash & Savings + Investments −
+Liabilities) a lo largo del tiempo, con un segmentador de periodo: 1M, 6M, YTD, 1Y, All o un rango
+personalizado (Custom).
+
+**Flujo principal**
+
+1. El usuario, dentro de la pestaña "Networth", selecciona un periodo (por defecto, "1M").
+2. El sistema determina el rango de meses correspondiente al periodo seleccionado.
+3. Para cada mes de ese rango, el sistema reconstruye Cash & Savings, Investments y Liabilities **a
+   la fecha de cierre de ese mes** (no al momento actual) y calcula el Networth de ese punto.
+4. El sistema devuelve la serie mensual del Networth total, lista para graficarse como línea, junto
+   con el rango de fechas disponible.
+
+**Flujos alternativos / casos borde**
+
+- La granularidad del histórico es siempre mensual — los periodos más cortos ("1M", "6M") muestran
+  menos puntos, no puntos más finos (RN-250).
+- Si un instrumento de inversión no tiene ningún registro en `investment_balance_history` anterior o
+  igual a la fecha de un punto, se considera que aún no existía en ese punto — su valor para ese mes
+  es `0` (mismo criterio que RN-232/RN-240 aplican a cuentas y tarjetas creadas a mitad de año).
+- Si el usuario no tiene ningún registro en ninguna de las cuatro fuentes (cuentas, metas,
+  inversiones, deudas), no hay periodo navegable — se muestra un estado vacío en vez de la gráfica.
+- En el periodo "Custom", si la fecha de inicio es posterior a la fecha de fin, se rechaza con
+  `VALIDATION_036` (nuevo — no existe un código previo para rango de fechas inválido; CU-016 de
+  [[transacciones]] filtra por rango sin validarlo como error).
+
+**Precondiciones**
+
+- El usuario debe estar autenticado.
+
+**Postcondiciones**
+
+- Ninguna — caso de uso de solo lectura.
+
+**Definición detallada de campos**
+
+| Campo | Tipo de control | Obligatorio | Longitud | Formato / validación | Dependencias | Valor por defecto | Regla de negocio |
+|---|---|---|---|---|---|---|---|
+| `periodo` (query param) | Segmentador | No | — | Enum: `1m`, `6m`, `ytd`, `1y`, `all`, `custom` | — | `1m` | RN-251 |
+| `fecha_inicio` (query param) | Date picker | Sí, solo si `periodo=custom` | — | Fecha válida | `periodo=custom` | — | RN-251 |
+| `fecha_fin` (query param) | Date picker | Sí, solo si `periodo=custom` | — | Fecha válida, ≥ `fecha_inicio` | `periodo=custom` | — | RN-251 |
+
+**Reglas de negocio**
+
+- RN-248: El Networth de un punto histórico (fin de mes) = Cash & Savings + Investments −
+  Liabilities a esa fecha, con los mismos criterios de agrupación de RN-242 a RN-244, pero
+  reconstruidos retroactivamente en vez de al momento actual.
+- RN-249: Reconstrucción "a la fecha" por fuente: cuentas débito/efectivo → `saldo_inicial` + Σ
+  transacciones con `fecha ≤` fin del punto (mismo cálculo que RN-230 de Balance); cuentas de
+  crédito → mismo cálculo, expresado como pasivo; metas de ahorro → `monto_inicial` − Σ
+  transacciones de la meta con `fecha ≤` fin del punto; deudas → `monto_original` − Σ
+  `monto_capital` pagado con `fecha ≤` fin del punto; inversiones → `balance` de
+  `investment_balance_history` con la `fecha` más reciente ≤ fin del punto (si no existe ningún
+  registro anterior, el instrumento vale `0` en ese punto).
+- RN-250: La granularidad del histórico es siempre mensual, sin importar el periodo seleccionado.
+- RN-251: Rango de meses según el periodo: `1m` = últimos 2 meses cerrados; `6m` = últimos 6 meses;
+  `ytd` = enero del año en curso al mes en curso; `1y` = últimos 12 meses; `all` = desde el mes de
+  creación del registro (cuenta, meta, inversión o deuda) más antiguo del usuario; `custom` = meses
+  entre `fecha_inicio` y `fecha_fin`.
+- RN-252: Si el usuario no tiene ningún registro en ninguna de las cuatro fuentes, no hay periodo
+  navegable — se muestra un estado vacío.
+
+**Casos de uso derivados identificados**
+
+- Ninguno adicional.
+
+**Validaciones**
+
+| Campo | Tipo | Reglas | Mitigación OWASP |
+|---|---|---|---|
+| `periodo` | enum | Uno de `1m`, `6m`, `ytd`, `1y`, `all`, `custom` | A03 — Validar contra catálogo cerrado |
+| `fecha_inicio`, `fecha_fin` | date | Obligatorias si `periodo=custom`; `fecha_fin ≥ fecha_inicio` | A03 — Validar formato y rango de fecha |
+
+**Mensajes de error**
+
+*Validación*
+- `VALIDATION_036`: "La fecha final no puede ser anterior a la fecha inicial." *(nuevo)*
+
+*Autenticación / autorización*
+- `AUTH_001`: "Tu sesión ha expirado. Inicia sesión nuevamente." *(reutilizado)*
+
+*Sistema*
+- `SYS_001`: "Ocurrió un error inesperado. Intenta de nuevo más tarde." *(reutilizado)*
+
+**Requerimientos técnicos backend**
+
+*Definición del servicio*
+
+| Método | Endpoint | Auth |
+|---|---|---|
+| GET | `/api/v1/dashboard/networth-history?periodo={periodo}&fecha_inicio={fecha_inicio}&fecha_fin={fecha_fin}` | Bearer JWT |
+
+*Request*
+```json
+{}
+```
+
+*Response (éxito)*
+```json
+{
+  "periodo": "1y",
+  "fecha_minima": "2024-03-01",
+  "fecha_maxima": "2026-08-01",
+  "meses": [
+    { "mes": "2026-07", "networth_total": 118420.10 },
+    { "mes": "2026-08", "networth_total": 124580.45 }
+  ]
+}
+```
+
+*Modelo de información*
+
+No introduce colección nueva — consulta agregada sobre `accounts`, `savings_goals`, `transactions`,
+`investments`, `investment_balance_history` y `debts`.
+
+*Decisiones de modelado*
+
+| Relación | Patrón | Justificación |
+|---|---|---|
+| Reconstrucción histórica multi-fuente | Cálculo derivado en tiempo de consulta | Generaliza el mismo mecanismo de RN-230 (Balance) a las cuatro fuentes del patrimonio; no se persiste ningún snapshot nuevo |
+| Granularidad mensual fija | Decisión de producto | Evita que Investments (actualizado manualmente, no a diario) se vea con saltos artificiales bajo una resolución más fina que la disponible |
+
+*Índices*
+
+Reutiliza `(account_id, fecha desc)`, `(meta_id, fecha desc)` y `(deuda_id, fecha desc)` de
+`transactions`, y `(user_id, fecha)` de `investment_balance_history` (ya definido en [[inversiones]]
+específicamente para este consumo futuro).
+
+**Matriz de pruebas**
+
+| # | Categoría | Escenario | Input | Resultado esperado | HTTP |
+|---|---|---|---|---|---|
+| 1 | Flujo exitoso | Usuario con datos en las cuatro fuentes, periodo `1y` | `periodo=1y` | Serie de 12 meses, Networth correcto por mes | 200 |
+| 2 | Lógica de negocio | Inversión creada a mitad de periodo | — | Meses anteriores a su primer snapshot en `0` | 200 |
+| 3 | Lógica de negocio | Periodo `custom` válido | `fecha_inicio`, `fecha_fin` | Serie mensual entre ambas fechas | 200 |
+| 4 | Lógica de negocio | Usuario sin ningún registro | — | Estado vacío, sin periodo navegable (RN-252) | 200 |
+| 5 | Validación de entrada | `custom` con `fecha_fin < fecha_inicio` | — | `VALIDATION_036` | 400 |
+| 6 | Autenticación / autorización | Token expirado o ausente | Sin JWT válido | `AUTH_001` | 401 |
+| 7 | Error del sistema | Falla de base de datos | Simulado | `SYS_001` | 500 |
+
+**Referencia de diseño**
+
+- Pantalla / flujo: Figma — [Networth tab](https://www.figma.com/design/McS1WiO2R2Z8sKpJBfkOx6/Finanzas-App---Artes?node-id=52-192) (gráfica "Total Networth")
+
+---
+
+### CU-067 — Consultar comparativo Networth balance (Assets vs Liabilities)
+
+**Actor:** Usuario autenticado (dueño de los datos)
+
+**Descripción del caso de uso**
+
+Esta funcionalidad permitirá al usuario consultar, dentro de la pestaña "Networth", un comparativo
+tipo donut entre "Assets" (Cash & Savings + Investments, valor actual) y "Liabilities" (valor
+actual) — a diferencia de CU-066, este comparativo es siempre un snapshot del momento presente, sin
+selector de periodo.
+
+**Flujo principal**
+
+1. El usuario, dentro de la pestaña "Networth", visualiza la card "Networth balance".
+2. El sistema toma los totales actuales de Cash & Savings, Investments y Liabilities ya calculados
+   en CU-065.
+3. El sistema suma Cash & Savings + Investments en un único total "Assets", y muestra "Assets" y
+   "Liabilities" como los dos segmentos del donut, junto con su monto.
+
+**Flujos alternativos / casos borde**
+
+- Si tanto Assets como Liabilities son $0, se muestra un estado vacío en lugar del donut.
+
+**Precondiciones**
+
+- El usuario debe estar autenticado.
+
+**Postcondiciones**
+
+- Ninguna — caso de uso de solo lectura.
+
+**Definición detallada de campos**
+
+_No aplica — este CU no captura datos, solo consulta información existente._
+
+**Reglas de negocio**
+
+- RN-253: Para este componente, "Assets" = Cash & Savings (RN-242) + Investments (RN-243), ambos en
+  su valor actual. "Liabilities" reutiliza el mismo total de RN-244. Este uso de "Assets" es
+  exclusivo de este componente — no debe confundirse con la card "Cash & Savings" de CU-065, que
+  solo cubre una parte de este total (ver nota de nomenclatura al inicio del documento).
+
+**Casos de uso derivados identificados**
+
+- Ninguno adicional.
+
+**Validaciones**
+
+_No aplica — sin parámetros de entrada._
+
+**Mensajes de error**
+
+*Autenticación / autorización*
+- `AUTH_001`: "Tu sesión ha expirado. Inicia sesión nuevamente." *(reutilizado)*
+
+*Sistema*
+- `SYS_001`: "Ocurrió un error inesperado. Intenta de nuevo más tarde." *(reutilizado)*
+
+**Requerimientos técnicos backend**
+
+*Definición del servicio*
+
+No requiere endpoint propio — se deriva en el cliente a partir de la respuesta de CU-065
+(`networth-breakdown`), sumando `cash_and_savings.total + investments.total` para "Assets" y
+reutilizando `liabilities.total` para "Liabilities".
+
+*Modelo de información*
+
+No introduce colección nueva.
+
+*Decisiones de modelado*
+
+| Relación | Patrón | Justificación |
+|---|---|---|
+| Composición en frontend | Sin consulta adicional | Los tres totales que necesita ya vienen en la respuesta de CU-065; pedirlos de nuevo duplicaría la consulta |
+
+**Matriz de pruebas**
+
+| # | Categoría | Escenario | Input | Resultado esperado | HTTP |
+|---|---|---|---|---|---|
+| 1 | Flujo exitoso | Usuario con Assets y Liabilities | — | Donut con ambos segmentos y montos correctos | — |
+| 2 | Lógica de negocio | Assets = 0 y Liabilities = 0 | — | Estado vacío | — |
+
+**Referencia de diseño**
+
+- Pantalla / flujo: Figma — [Networth tab](https://www.figma.com/design/McS1WiO2R2Z8sKpJBfkOx6/Finanzas-App---Artes?node-id=52-192) (card "Networth balance")
+
+---
+
+### CU-068 — Configurar y consultar avance hacia la meta de Networth
+
+**Actor:** Usuario autenticado (dueño de los datos)
+
+**Descripción del caso de uso**
+
+Esta funcionalidad permitirá al usuario configurar un monto objetivo de Networth desde un modal
+("Change goal") y consultar, dentro de la pestaña "Networth", su avance actual hacia esa meta
+mediante un gauge con el porcentaje alcanzado.
+
+**Flujo principal**
+
+1. El usuario, dentro de la pestaña "Networth", presiona "Change goal".
+2. El sistema muestra un modal con un único campo: monto objetivo.
+3. El usuario captura el monto y confirma.
+4. El sistema guarda el monto objetivo (un único registro por usuario, se sobreescribe si ya
+   existía uno).
+5. El sistema calcula el Networth actual (mismo cálculo de CU-067: Cash & Savings + Investments −
+   Liabilities, valor actual) y el porcentaje de avance respecto al monto objetivo, y actualiza el
+   gauge.
+
+**Flujos alternativos / casos borde**
+
+- Si el usuario no ha configurado ninguna meta, se muestra un estado vacío invitando a configurarla
+  ("Set a goal" en vez de "Change goal"), sin gauge ni porcentaje.
+- Si el Networth actual es negativo respecto al monto objetivo (resultado del cociente negativo), el
+  porcentaje mostrado es `0%`.
+- Si el Networth actual supera el monto objetivo, el gauge se topa visualmente en `100%`, pero el
+  porcentaje mostrado en texto refleja el valor real y puede superar `100%` (ej. `142%`).
+- Un monto objetivo `≤ 0` se rechaza con `VALIDATION_037`.
+
+**Precondiciones**
+
+- El usuario debe estar autenticado.
+
+**Postcondiciones**
+
+- Se crea o actualiza el registro de meta de Networth del usuario.
+
+**Definición detallada de campos**
+
+| Campo | Tipo de control | Obligatorio | Longitud | Formato / validación | Dependencias | Valor por defecto | Regla de negocio |
+|---|---|---|---|---|---|---|---|
+| `monto_objetivo` | CurrencyInput | Sí | — | Numérico, mayor a 0 | — | — | RN-254; `VALIDATION_037` |
+
+**Reglas de negocio**
+
+- RN-254: La meta de Networth es un único valor configurable por usuario, sin historial de metas
+  anteriores — se sobreescribe cada vez que se guarda un nuevo valor desde el modal "Change goal".
+- RN-255: El porcentaje de avance = Networth actual (mismo cálculo que RN-253, restando
+  Liabilities) ÷ meta configurada. Si el resultado es negativo, se muestra como `0%`. El gauge nunca
+  sobrepasa visualmente el `100%`, pero el porcentaje mostrado en texto refleja el valor real, aun
+  si supera `100%`.
+- RN-256: Si el usuario no ha configurado ninguna meta, se muestra un estado vacío invitando a
+  configurarla, sin gauge ni porcentaje.
+
+**Casos de uso derivados identificados**
+
+- Ninguno adicional.
+
+**Validaciones**
+
+| Campo | Tipo | Reglas | Mitigación OWASP |
+|---|---|---|---|
+| `monto_objetivo` | numeric | Obligatorio; mayor a 0 | A03 — Validar tipo y rango numérico |
+
+**Mensajes de error**
+
+*Validación*
+- `VALIDATION_037`: "El monto de la meta debe ser mayor a cero." *(nuevo)*
+
+*Autenticación / autorización*
+- `AUTH_001`: "Tu sesión ha expirado. Inicia sesión nuevamente." *(reutilizado)*
+
+*Sistema*
+- `SYS_001`: "Ocurrió un error inesperado. Intenta de nuevo más tarde." *(reutilizado)*
+
+**Requerimientos técnicos backend**
+
+*Definición del servicio*
+
+| Método | Endpoint | Auth |
+|---|---|---|
+| GET | `/api/v1/dashboard/networth-goal` | Bearer JWT |
+| PUT | `/api/v1/dashboard/networth-goal` | Bearer JWT |
+
+*Request (PUT)*
+```json
+{
+  "monto_objetivo": 1000000.00
+}
+```
+
+*Response (éxito, GET)*
+```json
+{
+  "monto_objetivo": 1000000.00,
+  "networth_actual": 124580.45,
+  "porcentaje_avance": 0.1246
+}
+```
+
+*Response (éxito, GET, sin meta configurada)*
+```json
+{
+  "monto_objetivo": null,
+  "networth_actual": 124580.45,
+  "porcentaje_avance": null
+}
+```
+
+*Modelo de información*
+
+Introduce la tabla nueva `networth_goals` — ver detalle en [[data-model-registry]].
+
+```json
+{
+  "user_id": "uuid"
+}
+```
+
+| Campo | Tipo | Requerido | Default | Procedencia (CU) |
+|---|---|---|---|---|
+| `user_id` | uuid (FK → users.id, primary key) | Sí | — | CU-068 |
+| `monto_objetivo` | numeric(14,2) | Sí | — | CU-068 (RN-254); editable, se sobreescribe (upsert) |
+| `created_at` | timestamptz | Sí | `now()` | CU-068 |
+| `updated_at` | timestamptz | Sí | `now()` | CU-068; se actualiza en cada cambio de meta |
+
+*Decisiones de modelado*
+
+| Relación | Patrón | Justificación |
+|---|---|---|
+| `user_id` como primary key (no `id` propio) | Una fila por usuario, sin historial | La meta no tiene versiones — cambiarla es un upsert directo sobre la única fila del usuario, sin necesidad de un identificador propio |
+
+*Índices*
+
+`user_id` ya es primary key — no requiere índice adicional.
+
+**Matriz de pruebas**
+
+| # | Categoría | Escenario | Input | Resultado esperado | HTTP |
+|---|---|---|---|---|---|
+| 1 | Flujo exitoso | Usuario configura una meta por primera vez | `monto_objetivo=1000000` | Se crea el registro, gauge muestra el % correcto | 200 |
+| 2 | Flujo exitoso | Usuario cambia una meta existente | `monto_objetivo=1500000` | Se sobreescribe el valor anterior | 200 |
+| 3 | Lógica de negocio | Networth actual supera la meta | — | Gauge al 100%, texto con el % real (ej. 142%) | 200 |
+| 4 | Lógica de negocio | Networth actual es negativo | — | Porcentaje mostrado como 0% | 200 |
+| 5 | Lógica de negocio | Usuario sin meta configurada | — | Estado vacío, `monto_objetivo = null` | 200 |
+| 6 | Validación de entrada | `monto_objetivo = 0` o negativo | `monto_objetivo=-100` | `VALIDATION_037` | 400 |
+| 7 | Autenticación / autorización | Token expirado o ausente | Sin JWT válido | `AUTH_001` | 401 |
+| 8 | Error del sistema | Falla de base de datos | Simulado | `SYS_001` | 500 |
+
+**Referencia de diseño**
+
+- Pantalla / flujo: Figma — [Networth tab](https://www.figma.com/design/McS1WiO2R2Z8sKpJBfkOx6/Finanzas-App---Artes?node-id=52-192) (card "Networth goal")
 
 ---
 
