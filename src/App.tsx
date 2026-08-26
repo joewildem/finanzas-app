@@ -7,11 +7,11 @@ import { AccountsListPage } from '@/pages/accounts/accounts-list-page'
 import { AuthCallbackPage } from '@/pages/auth-callback-page'
 import { BudgetPage } from '@/pages/budget/budget-page'
 import { CategoriesPage } from '@/pages/categories/categories-page'
+import { DashboardPage } from '@/pages/dashboard/dashboard-page'
 import { DebtDetailPage } from '@/pages/debts/debt-detail-page'
 import { DebtsListPage } from '@/pages/debts/debts-list-page'
 import { InvestmentsPage } from '@/pages/investments/investments-page'
 import { LoginPage } from '@/pages/login-page'
-import { PlaceholderPage } from '@/pages/placeholder-page'
 import { SavingsGoalDetailPage } from '@/pages/savings/savings-goal-detail-page'
 import { SavingsListPage } from '@/pages/savings/savings-list-page'
 import { SettingsLayout } from '@/pages/settings/settings-layout'
@@ -34,7 +34,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route element={<ProtectedLayout />}>
-          <Route path="/" element={<PlaceholderPage title="Dashboard" />} />
+          <Route path="/" element={<DashboardPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/budget" element={<BudgetPage />} />
           <Route path="/savings">

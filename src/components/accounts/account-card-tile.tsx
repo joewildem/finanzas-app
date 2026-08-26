@@ -49,10 +49,8 @@ export function AccountCardTile({ account }: { account: Account }) {
           </div>
         )}
 
-        {/* Mismo tamaño de monto (text-4xl font-mono) que la card "Total balance" del Dashboard —
-            centrado solo en el eje vertical, alineado a la izquierda en el horizontal. */}
         <div className="flex flex-1 items-center justify-start pt-3">
-          <p className="font-mono text-4xl font-medium text-white">
+          <p className="font-mono text-3xl font-medium text-white">
             {formatCurrency(account.saldo_actual)}
           </p>
         </div>

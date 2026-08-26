@@ -371,6 +371,9 @@ _No aplica — este CU no captura datos, solo consulta información existente._
   contra `gasto_minimo_mensual` para mostrar el avance. Si `gasto_minimo_mensual` es `0` o no está
   configurado, no se muestra el indicador. Si el gasto excede el mínimo, se muestra al 100% sin
   sobrepasar visualmente. **Corrige RN-084 de [[reportes]]** en el mismo sentido que RN-236.
+- RN-241: Encima de las cards, se muestra "Total credit cards" = suma de `saldo_actual` de todas las
+  cuentas `tipo = credito` activas — mismo patrón que el balance total de RN-225, sin concepto de
+  exclusión (`excluir_de_stats` no aplica al total de crédito, a diferencia de débito/efectivo).
 
 **Casos de uso derivados identificados**
 
@@ -404,6 +407,7 @@ _No aplica — sin parámetros de entrada._
 *Response (éxito)*
 ```json
 {
+  "balance_total": -15918.00,
   "tarjetas": [
     {
       "account_id": "665f...c01",
@@ -597,7 +601,7 @@ Reutiliza `(account_id, fecha desc)` de `transactions`.
 
 | Fecha | Cambio | CU afectado | Impacto en otros documentos |
 |---|---|---|---|
-| 2026-08-26 | Se documenta la pestaña Balance del módulo Dashboard: balance total + cards de cuentas débito/efectivo (imagen, orden, carrusel), evolución mensual de balance (año navegable limitado a años con datos), resumen de tarjetas de crédito (utilización, disponible, orden, carrusel) con el indicador de gasto mínimo recalculado por ciclo de corte en vez de mes calendario, y evolución mensual de gasto por tarjeta. Se agregan CU-061 a CU-064, RN-225 a RN-240. No se crean colecciones ni campos nuevos — agregación en tiempo de consulta sobre `accounts` y `transactions`, reutilizando `accounts.dia_corte` (ya existente desde [[cuentas]]) para el cálculo del ciclo de corte. Networth y Analytics quedan pendientes de documentar. Aprovechando esta revisión, se detectó y corrige una inconsistencia de formato en toda la plataforma (no específica de este módulo): montos siempre a 2 decimales, porcentajes a 1 decimal salvo que sea `.0`, en cuyo caso se muestra sin decimales — ver commit correspondiente. | CU-061, CU-062, CU-063, CU-064 | Se actualiza [[data-model-registry]] con el índice de numeración (hasta CU-064 / RN-240) y una nota de sucesión funcional sobre [[reportes]] — sin nuevas colecciones que registrar. |
+| 2026-08-26 | Se documenta la pestaña Balance del módulo Dashboard: balance total + cards de cuentas débito/efectivo (imagen, orden, carrusel), evolución mensual de balance (año navegable limitado a años con datos), resumen de tarjetas de crédito (utilización, disponible, orden, carrusel) con el indicador de gasto mínimo recalculado por ciclo de corte en vez de mes calendario, y evolución mensual de gasto por tarjeta. Se agregan CU-061 a CU-064, RN-225 a RN-241 (incluye RN-241, total de tarjetas de crédito, agregada durante la construcción en código). No se crean colecciones ni campos nuevos — agregación en tiempo de consulta sobre `accounts` y `transactions`, reutilizando `accounts.dia_corte` (ya existente desde [[cuentas]]) para el cálculo del ciclo de corte. Networth y Analytics quedan pendientes de documentar. Aprovechando esta revisión, se detectó y corrige una inconsistencia de formato en toda la plataforma (no específica de este módulo): montos siempre a 2 decimales, porcentajes a 1 decimal salvo que sea `.0`, en cuyo caso se muestra sin decimales — ver commit correspondiente. | CU-061, CU-062, CU-063, CU-064 | Se actualiza [[data-model-registry]] con el índice de numeración (hasta CU-064 / RN-240) y una nota de sucesión funcional sobre [[reportes]] — sin nuevas colecciones que registrar. |
 
 ## Referencias
 
