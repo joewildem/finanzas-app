@@ -9,6 +9,8 @@ import {
 } from '@hugeicons/core-free-icons'
 import { NavLink, useNavigate } from 'react-router-dom'
 
+import { BottomNav } from '@/components/bottom-nav'
+import { FloatingAddButton } from '@/components/floating-add-button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -30,59 +32,62 @@ function AppShellHeader() {
   }
 
   return (
-    <header className="relative flex h-14 items-center border-b border-border px-6">
-      {/* Centrado respecto al ancho total del header (no del espacio sobrante junto a las
-          acciones de la derecha) — position absolute + translate en vez de justify-between. */}
-      <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2">
-        <div className="flex size-6 items-center justify-center rounded-lg bg-brand">
-          <HugeiconsIcon icon={GalleryVerticalEndIcon} className="size-4 text-brand-foreground" />
+    <header className="border-b border-border">
+      <div className="relative mx-auto flex h-14 w-full max-w-[1600px] items-center px-6 sm:px-10 lg:px-14">
+        {/* Mobile (<md): logo centrado respecto al ancho total del header (position absolute +
+            translate). Desktop (md+): se cancela ese centrado y queda como bloque normal alineado
+            a la izquierda, junto con la nav. */}
+        <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2 md:static md:left-auto md:translate-x-0">
+          <div className="flex size-6 items-center justify-center rounded-lg bg-brand">
+            <HugeiconsIcon icon={GalleryVerticalEndIcon} className="size-4 text-brand-foreground" />
+          </div>
+          <nav className="hidden items-center gap-1 md:flex">
+            {NAV_ITEMS.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.path === '/'}
+                className={({ isActive }) =>
+                  cn(
+                    buttonVariants({ variant: 'ghost' }),
+                    isActive && 'bg-muted text-foreground',
+                  )
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
         </div>
-        <nav className="flex items-center gap-1">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              end={item.path === '/'}
-              className={({ isActive }) =>
-                cn(
-                  buttonVariants({ variant: 'ghost' }),
-                  isActive && 'bg-muted text-foreground',
-                )
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-      </div>
 
-      <div className="ml-auto flex items-center gap-2">
-        <Button onClick={() => openAddTransaction()}>
-          <HugeiconsIcon icon={ArrowUpRight01Icon} />
-          Add record
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<button type="button" aria-label="Account menu" className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring" />}
-          >
-            <Avatar>
-              <AvatarImage src={avatarUrl ?? undefined} />
-              <AvatarFallback>
-                <HugeiconsIcon icon={User02Icon} className="size-4" />
-              </AvatarFallback>
-            </Avatar>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => navigate('/settings')}>
-              <HugeiconsIcon icon={Settings01Icon} />
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuItem variant="destructive" onClick={handleSignOut}>
-              <HugeiconsIcon icon={Logout01Icon} />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="ml-auto flex items-center gap-2">
+          <Button className="hidden md:flex" onClick={() => openAddTransaction()}>
+            <HugeiconsIcon icon={ArrowUpRight01Icon} />
+            Add record
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<button type="button" aria-label="Account menu" className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring" />}
+            >
+              <Avatar>
+                <AvatarImage src={avatarUrl ?? undefined} />
+                <AvatarFallback>
+                  <HugeiconsIcon icon={User02Icon} className="size-4" />
+                </AvatarFallback>
+              </Avatar>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => navigate('/settings')}>
+                <HugeiconsIcon icon={Settings01Icon} />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuItem variant="destructive" onClick={handleSignOut}>
+                <HugeiconsIcon icon={Logout01Icon} />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
   )
@@ -93,7 +98,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     <AddTransactionProvider>
       <div className="flex min-h-svh flex-col bg-background">
         <AppShellHeader />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-6">{children}</main>
+        <main className="mx-auto w-full max-w-[1600px] flex-1 px-6 pt-6 pb-24 sm:px-10 md:pb-6 lg:px-14">
+          {children}
+        </main>
+        <BottomNav />
+        <FloatingAddButton />
       </div>
     </AddTransactionProvider>
   )
