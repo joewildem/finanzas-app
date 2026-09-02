@@ -20,9 +20,10 @@ export interface NetworthBreakdown {
 }
 
 // CU-065 — RN-242 a RN-247. Una sola pasada de consultas (cuentas activas, metas activas + sus
-// movimientos, inversiones activas, deudas activas + sus pagos) para construir los tres totales;
-// mismo criterio de "una sola consulta trae todo, se agrupa en cliente" ya usado en
-// SavingsListPage/DebtsListPage.
+// movimientos, todas las inversiones (activas e inactivas — el estado solo aplica al cálculo de
+// next share dentro de Inversiones, RN-148/149 de [[inversiones]], no a los totales agregados),
+// deudas activas + sus pagos) para construir los tres totales; mismo criterio de "una sola consulta
+// trae todo, se agrupa en cliente" ya usado en SavingsListPage/DebtsListPage.
 export function useNetworthBreakdown() {
   const [breakdown, setBreakdown] = useState<NetworthBreakdown | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
@@ -31,7 +32,7 @@ export function useNetworthBreakdown() {
     const [accountsRes, goalsRes, investmentsRes, debtsRes] = await Promise.all([
       supabase.from('accounts').select('*').eq('status', 'active'),
       supabase.from('savings_goals').select('*').eq('status', 'active'),
-      supabase.from('investments').select('*').eq('status', 'activo'),
+      supabase.from('investments').select('*'),
       supabase.from('debts').select('*').eq('status', 'active'),
     ])
 

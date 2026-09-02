@@ -36,9 +36,9 @@ export function NetworthBreakdownCard({ title, group }: { title: string; group: 
                 <div key={item.id} className="flex items-center justify-between gap-2">
                   <div className="flex flex-1 items-center gap-2">
                     <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="text-base font-medium text-card-foreground">{item.label}</span>
+                    <span className="text-sm font-regular text-card-foreground">{item.label}</span>
                   </div>
-                  <span className="font-mono text-base text-card-foreground">{formatCurrency(item.monto)}</span>
+                  <span className="font-mono text-sm text-card-foreground">{formatCurrency(item.monto)}</span>
                 </div>
               ))}
             </div>

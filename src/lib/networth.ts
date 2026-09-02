@@ -38,12 +38,14 @@ export function buildCashAndSavingsBreakdown(
   return { total: savingsTotal + debitTotal + cashTotal, items }
 }
 
-// RN-243 — agrupado por tipo_activo, solo tipos con al menos un instrumento activo (gratis, ya que
-// computeExposureBreakdown solo agrega lo que recibe).
+// RN-243 — agrupado por tipo_activo, sobre TODAS las inversiones (activas e inactivas — el estado
+// solo aplica al cálculo de next share dentro de Inversiones, no a los totales de Networth); solo
+// aparecen los tipos con al menos un instrumento (gratis, ya que computeExposureBreakdown solo
+// agrega lo que recibe).
 const INVESTMENT_COLOR_PALETTE = ['#581c87', '#7e22ce', '#a855f7', '#c084fc', '#d8b4fe', '#e9d5ff', '#3b0764']
 
-export function buildInvestmentsBreakdown(activeInvestments: Investment[]): NetworthBreakdownGroup {
-  const rows = computeExposureBreakdown(activeInvestments, 'tipo_activo')
+export function buildInvestmentsBreakdown(investments: Investment[]): NetworthBreakdownGroup {
+  const rows = computeExposureBreakdown(investments, 'tipo_activo')
   const total = rows.reduce((sum, r) => sum + r.monto, 0)
   const items = rows.map((r, i) => ({
     id: r.key,
@@ -105,13 +107,23 @@ function sumSignedUpTo(movimientos: { monto: number; fecha: string }[], cutoff: 
   return movimientos.filter((m) => !isAfter(new Date(m.fecha), cutoff)).reduce((sum, m) => sum + m.monto, 0)
 }
 
+// RN-040/RN-049 revisadas (2026-09-01, [[transacciones]]): en una cuenta `tipo = credito`,
+// `saldo_actual` es la deuda en positivo — el impacto de cada transacción se invierte respecto al
+// monto tal cual se almacena, salvo `ajuste` (su `monto` ya es el diff a aplicar directamente, sin
+// importar el tipo de cuenta). Esta reconstrucción "a la fecha" debe seguir la misma regla que ya
+// aplican los RPCs sobre el saldo en vivo, o un histórico de una tarjeta de crédito no coincide con
+// su saldo actual.
 export function computeAccountBalanceAsOf(
-  account: Pick<Account, 'saldo_inicial' | 'created_at'>,
-  movimientos: { monto: number; fecha: string }[],
+  account: Pick<Account, 'saldo_inicial' | 'created_at' | 'tipo'>,
+  movimientos: { monto: number; fecha: string; tipo: string }[],
   cutoff: Date,
 ): number {
   if (isAfter(new Date(account.created_at), cutoff)) return 0
-  return account.saldo_inicial + sumSignedUpTo(movimientos, cutoff)
+  const isCredito = account.tipo === 'credito'
+  const delta = movimientos
+    .filter((m) => !isAfter(new Date(m.fecha), cutoff))
+    .reduce((sum, m) => sum + (isCredito && m.tipo !== 'ajuste' ? -m.monto : m.monto), 0)
+  return account.saldo_inicial + delta
 }
 
 export function computeGoalAmountAsOf(

@@ -636,8 +636,8 @@ Reutiliza `(account_id, fecha desc)` de `transactions`.
 
 Esta funcionalidad permitirá al usuario consultar, en la columna izquierda de la pestaña "Networth"
 del Dashboard, tres cards con el resumen de su patrimonio agrupado en **Cash & Savings** (metas de
-ahorro activas, cuentas de débito y cuentas de efectivo), **Investments** (inversiones activas
-agrupadas por tipo de instrumento) y **Liabilities** (tarjetas de crédito y deudas activas
+ahorro activas, cuentas de débito y cuentas de efectivo), **Investments** (todas las inversiones,
+activas e inactivas, agrupadas por tipo de instrumento) y **Liabilities** (tarjetas de crédito y deudas activas
 agrupadas por tipo de deuda). Cada card muestra su total, una barra segmentada proporcional a los
 ítems que la componen, y el detalle de cada ítem.
 
@@ -647,8 +647,8 @@ agrupadas por tipo de deuda). Cada card muestra su total, una barra segmentada p
 2. El sistema calcula el total de Cash & Savings sumando `monto_aportado_actual` de las metas de
    ahorro activas del usuario, y `saldo_actual` de sus cuentas de débito y efectivo activas con
    `excluir_de_stats = false`.
-3. El sistema calcula el total de Investments sumando `balance_actual` de las inversiones activas
-   (`status = activo`) del usuario, agrupado por `tipo_activo`.
+3. El sistema calcula el total de Investments sumando `balance_actual` de **todas** las inversiones
+   del usuario, sin filtrar por `status` (RN-243 revisada), agrupado por `tipo_activo`.
 4. El sistema calcula el total de Liabilities sumando, en un grupo "Credit Cards", el valor absoluto
    de `saldo_actual` de las cuentas de crédito activas del usuario; y, en un grupo por cada `tipo`
    de deuda con al menos una deuda activa, el saldo calculado (`monto_original` menos capital
@@ -660,8 +660,10 @@ agrupadas por tipo de deuda). Cada card muestra su total, una barra segmentada p
 
 - Si un grupo no tiene ningún ítem con datos (ej. el usuario no tiene inversiones), la card muestra
   el total en $0.00 y un estado vacío en lugar de la barra segmentada y el detalle.
-- Las metas archivadas, cuentas archivadas, deudas archivadas e inversiones inactivas nunca
-  participan en estos totales ni aparecen como ítem.
+- Las metas archivadas, cuentas archivadas y deudas archivadas nunca participan en estos totales ni
+  aparecen como ítem. Las inversiones inactivas **sí** participan en el total y en el desglose de
+  Investments (RN-243 revisada) — `status` en Inversiones solo gobierna el cálculo de next share
+  (RN-148/149 de [[inversiones]]), no qué balance cuenta como patrimonio.
 - Un ítem con monto $0 (ej. una deuda activa ya liquidada pero aún no archivada, RN-204 de
   [[creditos-deudas]]) sí aparece en el detalle, en su posición correspondiente por orden.
 
@@ -683,9 +685,13 @@ _No aplica — este CU no captura datos, solo consulta información existente._
   usuario + Σ `saldo_actual` de `accounts` con `tipo = debito` o `tipo = efectivo`,
   `status = active` y `excluir_de_stats = false` — mismo criterio de exclusión que RN-225 de
   Balance, aplicado también aquí por ser un total de "patrimonio en estadísticas".
-- RN-243: Investments = Σ `balance_actual` de `investments` con `status = activo` del usuario,
-  agrupado por `tipo_activo`; solo se muestra un ítem por cada tipo que tenga al menos un
-  instrumento activo.
+- RN-243: Investments = Σ `balance_actual` de **todas** las `investments` del usuario (activas e
+  inactivas), agrupado por `tipo_activo`; solo se muestra un ítem por cada tipo que tenga al menos
+  un instrumento. **Revisado 2026-09-01:** hasta entonces la fórmula excluía `status = inactivo`,
+  replicando sin querer la exclusión que sí aplica correctamente al cálculo de next share
+  (RN-148/149 de [[inversiones]]) pero que no tiene sentido para un total de patrimonio — una
+  inversión inactiva sigue siendo un activo real del usuario, solo se excluyó de futuras
+  aportaciones automáticas.
 - RN-244: Liabilities = ítem "Credit Cards" (Σ `abs(saldo_actual)` de `accounts` con
   `tipo = credito` y `status = active`) + un ítem por cada `tipo` de `debts` con al menos una deuda
   activa (Σ del saldo calculado de esas deudas, RN-202 de [[creditos-deudas]]), etiquetado con
@@ -849,11 +855,17 @@ personalizado (Custom).
   reconstruidos retroactivamente en vez de al momento actual.
 - RN-249: Reconstrucción "a la fecha" por fuente: cuentas débito/efectivo → `saldo_inicial` + Σ
   transacciones con `fecha ≤` fin del punto (mismo cálculo que RN-230 de Balance); cuentas de
-  crédito → mismo cálculo, expresado como pasivo; metas de ahorro → `monto_inicial` − Σ
-  transacciones de la meta con `fecha ≤` fin del punto; deudas → `monto_original` − Σ
-  `monto_capital` pagado con `fecha ≤` fin del punto; inversiones → `balance` de
-  `investment_balance_history` con la `fecha` más reciente ≤ fin del punto (si no existe ningún
-  registro anterior, el instrumento vale `0` en ese punto).
+  crédito → mismo cálculo, pero el signo de cada transacción se invierte salvo que sea `ajuste`
+  (RN-040/RN-049 revisadas de [[transacciones]] — `saldo_actual` de una tarjeta es la deuda en
+  positivo, así que un gasto suma y un abono resta, lo opuesto a débito/efectivo), expresado como
+  pasivo; metas de ahorro → `monto_inicial` − Σ transacciones de la meta con `fecha ≤` fin del
+  punto; deudas → `monto_original` − Σ `monto_capital` pagado con `fecha ≤` fin del punto;
+  inversiones → `balance` de `investment_balance_history` con la `fecha` más reciente ≤ fin del
+  punto (si no existe ningún registro anterior, el instrumento vale `0` en ese punto). **Revisado
+  2026-09-01:** hasta entonces la reconstrucción de cuentas de crédito sumaba el monto tal cual
+  (mismo criterio que débito/efectivo), replicando el bug ya corregido en RN-040/RN-049 pero solo
+  para el histórico — el "Total Networth" del punto más reciente podía no coincidir con Assets −
+  Liabilities calculado en vivo.
 - RN-250: La granularidad del histórico es siempre mensual, sin importar el periodo seleccionado.
 - RN-251: Rango de meses según el periodo: `1m` = últimos 2 meses cerrados; `6m` = últimos 6 meses;
   `ytd` = enero del año en curso al mes en curso; `1y` = últimos 12 meses; `all` = desde el mes de
@@ -1592,6 +1604,7 @@ No introduce colección nueva — consulta agregada sobre `transactions` y `cate
 | 2026-08-26 | Se documenta la pestaña Balance del módulo Dashboard: balance total + cards de cuentas débito/efectivo (imagen, orden, carrusel), evolución mensual de balance (año navegable limitado a años con datos), resumen de tarjetas de crédito (utilización, disponible, orden, carrusel) con el indicador de gasto mínimo recalculado por ciclo de corte en vez de mes calendario, y evolución mensual de gasto por tarjeta. Se agregan CU-061 a CU-064, RN-225 a RN-241 (incluye RN-241, total de tarjetas de crédito, agregada durante la construcción en código). No se crean colecciones ni campos nuevos — agregación en tiempo de consulta sobre `accounts` y `transactions`, reutilizando `accounts.dia_corte` (ya existente desde [[cuentas]]) para el cálculo del ciclo de corte. Networth y Analytics quedan pendientes de documentar. Aprovechando esta revisión, se detectó y corrige una inconsistencia de formato en toda la plataforma (no específica de este módulo): montos siempre a 2 decimales, porcentajes a 1 decimal salvo que sea `.0`, en cuyo caso se muestra sin decimales — ver commit correspondiente. | CU-061, CU-062, CU-063, CU-064 | Se actualiza [[data-model-registry]] con el índice de numeración (hasta CU-064 / RN-240) y una nota de sucesión funcional sobre [[reportes]] — sin nuevas colecciones que registrar. |
 | 2026-08-26 | Se documenta la pestaña Networth del módulo Dashboard — territorio nuevo, no sucede a ningún CU de [[reportes]]. Se agregan CU-065 a CU-068: desglose de Cash & Savings/Investments/Liabilities, histórico de Networth total con selector de periodo, comparativo Assets vs Liabilities, y meta de Networth configurable. Se introduce la tabla `networth_goals`. Analytics queda pendiente. | CU-065, CU-066, CU-067, CU-068 | Se actualiza [[data-model-registry]] con el índice de numeración (hasta CU-068 / RN-256 / VALIDATION_037), la tabla `networth_goals`, sus relaciones y el diagrama ER — ver el detalle completo en el historial de [[data-model-registry]]. |
 | 2026-08-28 | Se documenta la pestaña Analytics del módulo Dashboard, la última del alcance completo: cuatro cards de resumen (Income, Expenses, Savings, Investment) con comparativo contra el periodo anterior equivalente, gráfica de Cash Flow (Income vs Expenses, granularidad siempre mensual) y una card de barras horizontales por cada grupo de categorías del usuario. Se agregan CU-069 a CU-071, RN-257 a RN-269. **Cambio previo, disparado por esta pestaña:** `categories.flujo` gana un tercer valor estructural, `investment` (antes un subconjunto de Outflow distinguido por nombre exacto) — ver changelog de [[categorias]] del mismo día. Con esto, Expenses e Investment nunca se traslapan sin depender de un nombre de grupo. Suceden funcionalmente a CU-027, CU-028 y CU-030 de [[reportes]] (resumen por grupo, distribución de gasto por categoría, ingresos vs. gastos) — CU-031 (frecuencia de transacciones) no se retoma, queda en [[backlog]]. Los números `CU-023`–`CU-031`/`RN-076`–`RN-097` de [[reportes]] no se reutilizan ni se renumeran. No se crean colecciones nuevas — 100% agregación en tiempo de consulta sobre `transactions`, `categories` y `savings_goals`. Con esta pestaña se completa la construcción en código de todo el alcance definido del producto. | CU-069, CU-070, CU-071 | Se actualiza [[data-model-registry]] con el índice de numeración (hasta CU-071 / RN-269) y la nota de sucesión final sobre [[reportes]]. |
+| 2026-09-01 | Corrección de bug detectado con datos de producción: se revisa **RN-243** — Investments ya no excluye inversiones con `status = inactivo` de la card de Networth (ni de su histórico, CU-066). El estado de una inversión solo gobierna el cálculo de next share dentro de Inversiones (RN-148/149 de [[inversiones]]); no tiene relación con si su balance cuenta como patrimonio. `useNetworthBreakdown`/`useNetworthHistory` dejan de filtrar `status = activo` en la consulta a `investments`. **Segunda corrección el mismo día:** se revisa también **RN-249** — `computeAccountBalanceAsOf` (reconstrucción "a la fecha" de CU-066) no conocía la inversión de signo que RN-040/RN-049 ya aplican a cuentas de crédito en el saldo en vivo, así que el histórico de "Total Networth" podía no coincidir con Assets − Liabilities del momento actual. Se corrige para aplicar la misma regla (invertir el monto salvo `ajuste`) cuando la cuenta es de crédito. No se agregan CU ni RN nuevos en este documento. | CU-065, CU-066 | Sin cambios en [[data-model-registry]] — no hay cambio de esquema, solo de lógica |
 
 ## Referencias
 

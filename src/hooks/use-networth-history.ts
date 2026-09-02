@@ -33,6 +33,8 @@ function groupBy<T, K extends string | null>(rows: T[], keyOf: (row: T) => K): R
 // CU-066 — RN-248 a RN-252. Trae todas las fuentes completas (sin filtro de fecha, se necesita el
 // historial completo para reconstruir cualquier punto) y reconstruye, mes a mes, Cash & Savings +
 // Investments - Liabilities "a la fecha" (RN-249), con granularidad siempre mensual (RN-250).
+// Inversiones se traen activas e inactivas — el estado solo aplica al cálculo de next share dentro
+// de Inversiones (RN-148/149 de [[inversiones]]), no a los totales agregados de Networth.
 export function useNetworthHistory(periodo: NetworthPeriod, customRange?: { fechaInicio: Date; fechaFin: Date }) {
   const [meses, setMeses] = useState<NetworthHistoryPoint[] | undefined>(undefined)
   const [earliestDate, setEarliestDate] = useState<Date | null>(null)
@@ -46,7 +48,7 @@ export function useNetworthHistory(periodo: NetworthPeriod, customRange?: { fech
       supabase.from('accounts').select('*').eq('status', 'active'),
       supabase.from('savings_goals').select('*').eq('status', 'active'),
       supabase.from('debts').select('*').eq('status', 'active'),
-      supabase.from('investments').select('*').eq('status', 'activo'),
+      supabase.from('investments').select('*'),
       supabase.from('investment_balance_history').select('investment_id, fecha, balance'),
     ])
     const firstError =
@@ -65,8 +67,8 @@ export function useNetworthHistory(periodo: NetworthPeriod, customRange?: { fech
     const accountIds = accounts.map((a) => a.id)
     const [accountTxRes, goalTxRes, debtTxRes] = await Promise.all([
       accountIds.length
-        ? supabase.from('transactions').select('account_id, monto, fecha').in('account_id', accountIds)
-        : Promise.resolve({ data: [] as { account_id: string; monto: number; fecha: string }[], error: null }),
+        ? supabase.from('transactions').select('account_id, monto, fecha, tipo').in('account_id', accountIds)
+        : Promise.resolve({ data: [] as { account_id: string; monto: number; fecha: string; tipo: string }[], error: null }),
       supabase
         .from('transactions')
         .select('meta_id, monto, fecha')
@@ -81,7 +83,7 @@ export function useNetworthHistory(periodo: NetworthPeriod, customRange?: { fech
     setError(null)
 
     const txByAccount = groupBy(
-      accountTxRes.data as { account_id: string | null; monto: number; fecha: string }[],
+      accountTxRes.data as { account_id: string | null; monto: number; fecha: string; tipo: string }[],
       (r) => r.account_id,
     )
     const movementsByGoal = groupBy(

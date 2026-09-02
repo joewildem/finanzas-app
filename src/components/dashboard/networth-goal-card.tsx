@@ -36,7 +36,7 @@ export function NetworthGoalCard({
             {hasGoal ? 'Change' : 'Set a goal'}
           </Button>
         </div>
-        <p className="font-mono text-1xl font-regular text-card-foreground">
+        <p className="font-mono text-xl font-regular text-card-foreground">
           {hasGoal ? formatCurrency(montoObjetivo) : '—'}
         </p>
       </CardHeader>
