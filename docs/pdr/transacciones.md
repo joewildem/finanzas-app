@@ -114,7 +114,12 @@ de `tipo = gasto` igual que cualquier otra.
   directamente (mismo campo que Inflow/Outflow), y por eso `create_transaction`/`update_transaction`
   amplían su validación de `gasto` para aceptar ambos flujos no-inflow.
 - RN-040: Registrar un gasto o ingreso actualiza `saldo_actual` de la cuenta asociada sumando el
-  monto con signo, de forma atómica junto con la creación del documento en `transactions`.
+  monto con signo, de forma atómica junto con la creación del documento en `transactions`. **Revisado
+  2026-09-01:** en una cuenta `tipo = credito`, `saldo_actual` representa la deuda en positivo (ver
+  [[cuentas]]) — el impacto se invierte respecto a débito/efectivo: un gasto la incrementa y un
+  ingreso la reduce. El signo de `monto` en `transactions` no cambia (sigue siendo negativo para
+  gasto, positivo para ingreso, sin importar el tipo de cuenta) — solo cambia cómo ese monto se
+  refleja en `saldo_actual` cuando la cuenta es de crédito.
 - RN-041: La categoría debe existir, pertenecer al usuario, estar en `status = active`, y ser
   `tipo = categoria` (no grupo) — mismo patrón IDOR que BIZ-005 de [[categorias]].
 - RN-042: La cuenta debe existir, pertenecer al usuario y estar en `status = active` — una cuenta
@@ -467,8 +472,8 @@ efecto es reducir la deuda de la tarjeta. No lleva categoría, igual que la tran
 
 - Se crean dos documentos en `transactions` con `tipo = pago_tarjeta`, enlazados entre sí, sin
   `category_id`.
-- `saldo_actual` de la cuenta origen disminuye; `saldo_actual` de la tarjeta aumenta (se acerca a
-  cero, reduciendo la deuda) en el mismo monto.
+- `saldo_actual` de la cuenta origen disminuye; `saldo_actual` de la tarjeta también disminuye
+  (reduciendo la deuda, almacenada en positivo — ver RN-049) en el mismo monto.
 
 **Definición detallada de campos**
 
@@ -485,9 +490,17 @@ efecto es reducir la deuda de la tarjeta. No lleva categoría, igual que la tran
 - RN-048: `cuenta_destino_id` debe ser una cuenta propia de `tipo = credito`; `cuenta_origen_id`
   debe ser una cuenta propia de `tipo = debito` o `tipo = efectivo` — no se permite pagar una
   tarjeta con otra tarjeta desde este caso de uso.
-- RN-049: El abono aumenta el `saldo_actual` de la tarjeta (almacenado en negativo como deuda, ver
-  [[cuentas]]), acercándolo a cero; nunca lo hace positivo por encima de cero desde este caso de
-  uso — un sobrepago se registra igual, la validación de tope queda fuera de alcance del MVP.
+- RN-049: El abono reduce el `saldo_actual` de la tarjeta (almacenado en positivo como deuda);
+  nunca lo hace negativo desde este caso de uso — un sobrepago se registra igual, la validación de
+  tope queda fuera de alcance del MVP. **Revisado 2026-09-01:** hasta entonces esta regla y su
+  implementación asumían almacenamiento en negativo (el abono sumaba en vez de restar) — un bug real
+  detectado con datos de producción: el resto del sistema (ajuste manual, detalle de cuenta,
+  card-tile, "Total credit cards" del Dashboard) siempre trató `saldo_actual` de una tarjeta como
+  positivo, así que un abono terminaba sumándose como más deuda en vez de reducirla. Se corrigió
+  `create_credit_card_payment` para restar en ambos lados, y `create_transaction`/`update_transaction`/
+  `delete_transaction` para invertir el impacto sobre `saldo_actual` en cuentas de crédito (ver
+  `supabase/migrations/20260901100000_fix_credit_account_balance_sign.sql`, que también corrige los
+  saldos ya afectados).
 - RN-050: Se generan dos documentos en `transactions` enlazados por `transaccion_relacionada_id`,
   con `tipo = pago_tarjeta`, sin `category_id`, siguiendo el mismo patrón de atomicidad que RN-045
   y RN-046 (CU-014).
@@ -1050,6 +1063,7 @@ Sin cambios — reutiliza los índices existentes.
 | 2026-08-22 | Cambio cruzado desde [[ahorros-y-metas]]: se corrige el resumen del módulo (arriba) — una aportación o retiro de meta **no** sigue el patrón de dos documentos enlazados, es una fila única vía el nuevo campo `transactions.meta_id`. El enum `tipo` gana `retiro_meta` (nuevo); `aportacion_meta`, reservado desde el 2026-07-30, queda habilitado. La condición de `transaccion_relacionada_id` se reduce a `tipo = transferencia\|pago_tarjeta` — deja de incluir `aportacion_meta`. `update_transaction` (CU-017) gana el parámetro `p_meta_id` — editable bajo las mismas condiciones que `category_id` (RN-152 de [[ahorros-y-metas]]). `delete_transaction` (CU-018) no requiere cambios — al ser filas únicas, ya revierte correctamente el saldo de la única cuenta involucrada. No se agregan CU ni RN nuevos en este documento. | CU-013, CU-017, CU-018 | Se actualiza [[data-model-registry]]: `transactions.meta_id`, enum `tipo` con `retiro_meta`, condición de `transaccion_relacionada_id` corregida — ver [[ahorros-y-metas]] para el detalle completo |
 | 2026-08-24 | Cambio cruzado desde [[creditos-deudas]]: se corrige el resumen del módulo (arriba) — el pago a una deuda externa, antes fuera de alcance, ya está resuelto como una fila única (mismo patrón que `aportacion_meta`/`retiro_meta`). El enum `tipo` gana `pago_deuda` (nuevo); se agregan `deuda_id`, `monto_capital` y `monto_interes` al esquema de `transactions`, mutuamente excluyentes con `category_id`/`meta_id`. `update_transaction` (CU-017) gana los tres como parámetros editables bajo las mismas condiciones que `category_id`/`meta_id` (`RN-224`, nueva). `delete_transaction` (CU-018) no requiere cambios — al ser fila única, ya revierte correctamente el saldo de la única cuenta involucrada. | CU-013, CU-017, CU-018 | Se actualiza [[data-model-registry]]: `transactions.deuda_id`/`monto_capital`/`monto_interes`, enum `tipo` con `pago_deuda` — ver [[creditos-deudas]] para el detalle completo |
 | 2026-08-28 | Cambio cruzado desde [[categorias]] (RN-118 revisada): se revisa nuevamente **RN-039** — `tipo = gasto` ahora admite `flujo = outflow` **o** `flujo = investment` (antes solo `outflow`); `tipo = ingreso` sigue exigiendo `flujo = inflow`, sin cambio. `create_transaction` y `update_transaction` se actualizan (`supabase/migrations/20260828100001_backfill_category_flow_investment.sql`), mismo código de error (`BIZ_009`), sin cambio de firma. El chip "Investment" del formulario de alta deja de acotar por nombre de grupo — ahora filtra por `flujo = investment` directamente, cerrando la excepción que la revisión de 2026-08-11 había dejado fuera de alcance. No se agregan CU ni RN nuevos en este documento. | CU-013, CU-014, CU-017 | Se actualiza [[data-model-registry]]: enum `category_flow` con `investment`, sin cambio de numeración |
+| 2026-09-01 | Corrección de bug detectado con datos de producción: se revisan **RN-040** y **RN-049** — `saldo_actual` de una cuenta `tipo = credito` se confirma como definitivo en positivo (representa la deuda), no en negativo como asumía la redacción original de RN-049. `create_credit_card_payment` restaba mal el abono (lo sumaba); `create_transaction`, `update_transaction` y `delete_transaction` nunca invertían el impacto sobre `saldo_actual` para cuentas de crédito. Se corrigen las cuatro funciones y se incluye una corrección de datos de una sola vez para los saldos ya afectados (`supabase/migrations/20260901100000_fix_credit_account_balance_sign.sql`). `transactions.monto` no cambia de signo en ningún caso — RN-038 intacto, sin impacto en Budget/Analytics/Reportes. No se agregan CU ni RN nuevos en este documento. | CU-013, CU-015, CU-017, CU-018 | Sin cambios en [[data-model-registry]] — no hay cambio de esquema, solo de lógica y datos |
 
 ### CU-035 — Aplicar acciones en lote sobre transacciones (batch actions)
 
