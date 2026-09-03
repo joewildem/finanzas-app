@@ -82,7 +82,7 @@ export function BudgetPage() {
     seededMesRef.current = mes
     const initial: Record<string, number | undefined> = {}
     for (const budget of budgets) {
-      const key = budget.category_id ?? budget.meta_id
+      const key = budget.category_id ?? budget.meta_id ?? budget.deuda_id
       if (key) initial[key] = budget.monto
     }
     setAmounts(initial)
