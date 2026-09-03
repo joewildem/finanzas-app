@@ -28,6 +28,10 @@ function availableColorClass(assigned: number, current: number, isIncome: boolea
 }
 
 const AMOUNT_COL_WIDTH = 'w-[140px]'
+// Los montos de las filas de grupo (Bills, Needs, Savings, Debts…) se ven un poco más chicos y en
+// semibold que los de sus categorías/metas/deudas individuales, para distinguir el resumen del
+// detalle a simple vista.
+const GROUP_ROW_AMOUNT_CLASS = 'text-right font-mono text-sm font-normal'
 
 export function BudgetTable({
   title,
@@ -116,16 +120,16 @@ export function BudgetTable({
                         <span className="font-medium text-foreground">{group.nombre}</span>
                       </div>
                     </TableCell>
-                    <TableCell className={cn(CELL_PADDING, 'text-right font-mono text-foreground')}>
+                    <TableCell className={cn(CELL_PADDING, GROUP_ROW_AMOUNT_CLASS, 'text-foreground')}>
                       {formatCurrency(groupAssigned)}
                     </TableCell>
-                    <TableCell className={cn(CELL_PADDING, 'text-right font-mono text-foreground')}>
+                    <TableCell className={cn(CELL_PADDING, GROUP_ROW_AMOUNT_CLASS, 'text-foreground')}>
                       {formatCurrency(groupCurrent)}
                     </TableCell>
                     <TableCell
                       className={cn(
                         CELL_PADDING,
-                        'text-right font-mono',
+                        GROUP_ROW_AMOUNT_CLASS,
                         availableColorClass(groupAssigned, groupCurrent, isIncome),
                       )}
                     >
@@ -151,9 +155,10 @@ export function BudgetTable({
                             value={amounts[category.id]}
                             onChange={(value) => onChangeAmount(category.id, value)}
                             allowEmpty
+                            variant="flat"
                           />
                         </TableCell>
-                        <TableCell className={cn(CELL_PADDING, 'text-right font-mono text-muted-foreground')}>
+                        <TableCell className={cn(CELL_PADDING, 'text-right font-mono text-foreground')}>
                           {formatCurrency(actuals[category.id] ?? 0)}
                         </TableCell>
                         <TableCell className={cn(CELL_PADDING, 'text-right')}>
@@ -184,16 +189,16 @@ export function BudgetTable({
                       <span className="font-medium text-foreground">Savings</span>
                     </div>
                   </TableCell>
-                  <TableCell className={cn(CELL_PADDING, 'text-right font-mono text-foreground')}>
+                  <TableCell className={cn(CELL_PADDING, GROUP_ROW_AMOUNT_CLASS, 'text-foreground')}>
                     {formatCurrency(goalsAssigned)}
                   </TableCell>
-                  <TableCell className={cn(CELL_PADDING, 'text-right font-mono text-foreground')}>
+                  <TableCell className={cn(CELL_PADDING, GROUP_ROW_AMOUNT_CLASS, 'text-foreground')}>
                     {formatCurrency(goalsCurrent)}
                   </TableCell>
                   <TableCell
                     className={cn(
                       CELL_PADDING,
-                      'text-right font-mono',
+                      GROUP_ROW_AMOUNT_CLASS,
                       availableColorClass(goalsAssigned, goalsCurrent, isIncome),
                     )}
                   >
@@ -217,9 +222,10 @@ export function BudgetTable({
                           value={amounts[goal.id]}
                           onChange={(value) => onChangeAmount(goal.id, value)}
                           allowEmpty
+                          variant="flat"
                         />
                       </TableCell>
-                      <TableCell className={cn(CELL_PADDING, 'text-right font-mono text-muted-foreground')}>
+                      <TableCell className={cn(CELL_PADDING, 'text-right font-mono text-foreground')}>
                         {formatCurrency(actuals[goal.id] ?? 0)}
                       </TableCell>
                       <TableCell className={cn(CELL_PADDING, 'text-right')}>
@@ -249,16 +255,16 @@ export function BudgetTable({
                       <span className="font-medium text-foreground">Debts</span>
                     </div>
                   </TableCell>
-                  <TableCell className={cn(CELL_PADDING, 'text-right font-mono text-foreground')}>
+                  <TableCell className={cn(CELL_PADDING, GROUP_ROW_AMOUNT_CLASS, 'text-foreground')}>
                     {formatCurrency(debtsAssigned)}
                   </TableCell>
-                  <TableCell className={cn(CELL_PADDING, 'text-right font-mono text-foreground')}>
+                  <TableCell className={cn(CELL_PADDING, GROUP_ROW_AMOUNT_CLASS, 'text-foreground')}>
                     {formatCurrency(debtsCurrent)}
                   </TableCell>
                   <TableCell
                     className={cn(
                       CELL_PADDING,
-                      'text-right font-mono',
+                      GROUP_ROW_AMOUNT_CLASS,
                       availableColorClass(debtsAssigned, debtsCurrent, isIncome),
                     )}
                   >
@@ -284,9 +290,10 @@ export function BudgetTable({
                           value={amounts[debt.id]}
                           onChange={(value) => onChangeAmount(debt.id, value)}
                           allowEmpty
+                          variant="flat"
                         />
                       </TableCell>
-                      <TableCell className={cn(CELL_PADDING, 'text-right font-mono text-muted-foreground')}>
+                      <TableCell className={cn(CELL_PADDING, 'text-right font-mono text-foreground')}>
                         {formatCurrency(actuals[debt.id] ?? 0)}
                       </TableCell>
                       <TableCell className={cn(CELL_PADDING, 'text-right')}>
