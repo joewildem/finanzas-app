@@ -7,6 +7,7 @@ import { AccountsListPage } from '@/pages/accounts/accounts-list-page'
 import { AuthCallbackPage } from '@/pages/auth-callback-page'
 import { BudgetPage } from '@/pages/budget/budget-page'
 import { CategoriesPage } from '@/pages/categories/categories-page'
+import { DashboardAccountDetailPage } from '@/pages/dashboard/account-detail-page'
 import { DashboardPage } from '@/pages/dashboard/dashboard-page'
 import { DebtDetailPage } from '@/pages/debts/debt-detail-page'
 import { DebtsListPage } from '@/pages/debts/debts-list-page'
@@ -35,6 +36,7 @@ function App() {
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route element={<ProtectedLayout />}>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/accounts/:accountId" element={<DashboardAccountDetailPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/budget" element={<BudgetPage />} />
           <Route path="/savings">

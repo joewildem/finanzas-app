@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 import { Badge } from '@/components/ui/badge'
 import { ACCOUNT_IMAGE_ASPECT_CLASS, ACCOUNT_TYPE_LABELS, formatCurrency, type Account } from '@/lib/accounts'
 
@@ -5,13 +7,16 @@ import { ACCOUNT_IMAGE_ASPECT_CLASS, ACCOUNT_TYPE_LABELS, formatCurrency, type A
 // existe; si no, un degradado a partir de `color` para que toda cuenta se vea "con tarjeta" de
 // forma consistente, no solo las que tienen foto. Misma relación de aspecto que el campo de carga
 // de imagen (ACCOUNT_IMAGE_ASPECT_CLASS) — lo que se recorta en el formulario es lo que se ve aquí.
+// Enlaza al detalle de cuenta del Dashboard (dashboard/account-detail-page.tsx) — este componente
+// solo se usa en la pestaña Balance, nunca en un contexto de solo-lectura.
 export function AccountCardTile({ account }: { account: Account }) {
   const hasImage = Boolean(account.imagen_url)
   const hasBadges = account.excluir_de_stats || account.status === 'archived'
 
   return (
-    <div
-      className={`relative overflow-hidden rounded-xl ${ACCOUNT_IMAGE_ASPECT_CLASS} ${
+    <Link
+      to={`/accounts/${account.id}`}
+      className={`relative block overflow-hidden rounded-xl ${ACCOUNT_IMAGE_ASPECT_CLASS} ${
         account.status === 'archived' ? 'opacity-60' : ''
       }`}
       style={
@@ -60,6 +65,6 @@ export function AccountCardTile({ account }: { account: Account }) {
           <p className="text-xs text-white/70">{ACCOUNT_TYPE_LABELS[account.tipo]}</p>
         </div>
       </div>
-    </div>
+    </Link>
   )
 }

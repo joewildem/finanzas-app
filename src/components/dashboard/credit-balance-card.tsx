@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 import type { CycleSpend } from '@/hooks/use-credit-cards-cycle-spend'
 import { ACCOUNT_IMAGE_ASPECT_CLASS, computeAvailableCredit, formatCurrency, type Account } from '@/lib/accounts'
 import { formatPercent } from '@/lib/utils'
@@ -6,7 +8,8 @@ import { formatPercent } from '@/lib/utils'
 // para legibilidad), pero con contenido propio de tarjeta de crédito: barra de utilización de línea
 // de crédito (RN-234) y, si `gasto_minimo_mensual` está configurado, una segunda barra con el
 // avance de gasto del ciclo de corte en curso (RN-236/RN-237) — ambas ancladas abajo en vez del
-// renglón "tipo" que usa AccountCardTile, porque aquí no aplica (siempre es `credito`).
+// renglón "tipo" que usa AccountCardTile, porque aquí no aplica (siempre es `credito`). Enlaza al
+// detalle de cuenta del Dashboard, igual que AccountCardTile.
 export function CreditBalanceCard({ account, cycleSpend }: { account: Account; cycleSpend?: CycleSpend }) {
   const hasImage = Boolean(account.imagen_url)
   const lineaCredito = account.linea_credito ?? 0
@@ -18,8 +21,9 @@ export function CreditBalanceCard({ account, cycleSpend }: { account: Account; c
   const porcentajeAvanceMinimo = showCycle ? Math.min(cycleSpend!.gasto_ciclo_actual / gastoMinimo, 1) : 0
 
   return (
-    <div
-      className={`relative overflow-hidden rounded-xl ${ACCOUNT_IMAGE_ASPECT_CLASS}`}
+    <Link
+      to={`/accounts/${account.id}`}
+      className={`relative block overflow-hidden rounded-xl ${ACCOUNT_IMAGE_ASPECT_CLASS}`}
       style={
         hasImage
           ? undefined
@@ -71,6 +75,6 @@ export function CreditBalanceCard({ account, cycleSpend }: { account: Account; c
           )}
         </div>
       </div>
-    </div>
+    </Link>
   )
 }
