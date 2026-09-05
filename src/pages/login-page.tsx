@@ -3,6 +3,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { GalleryVerticalEndIcon } from '@hugeicons/core-free-icons'
 
 import { AuthErrorAlert } from '@/components/auth-error-alert'
+import { DevSignInPanel } from '@/components/dev-sign-in-panel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { resolveAuthErrorFromLocation, type AuthErrorCode } from '@/lib/auth-errors'
@@ -10,7 +11,10 @@ import { supabase } from '@/lib/supabase'
 import loginBackground from '@/assets/login/login-background.png'
 import googleIcon from '@/assets/login/google-icon.svg'
 
-// CU-032 — Iniciar sesión con Google: única opción de ingreso, sin correo/contraseña.
+// CU-032 — Iniciar sesión con Google: única opción de ingreso en producción, sin correo/contraseña.
+// DevSignInPanel es la excepción del ambiente local (Supabase en Docker, sin OAuth configurado) y va
+// detrás de `import.meta.env.DEV`, que Vite sustituye por `false` al compilar producción — el
+// componente entero queda sin referencias y se elimina del bundle publicado.
 export function LoginPage() {
   const [errorCode, setErrorCode] = useState<AuthErrorCode | null>(null)
   const [isRedirecting, setIsRedirecting] = useState(false)
@@ -72,6 +76,8 @@ export function LoginPage() {
               <img src={googleIcon} alt="" className="size-4" />
               {isRedirecting ? 'Redirecting…' : 'Continue with Google'}
             </Button>
+
+            {import.meta.env.DEV && <DevSignInPanel />}
           </CardContent>
         </Card>
       </div>

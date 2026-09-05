@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom
 
 import { AppShell } from '@/components/app-shell'
 import { AuthGate } from '@/components/auth-gate'
+import { EnvBadge } from '@/components/env-badge'
 import { AccountDetailPage } from '@/pages/accounts/account-detail-page'
 import { AccountsListPage } from '@/pages/accounts/accounts-list-page'
 import { AuthCallbackPage } from '@/pages/auth-callback-page'
@@ -59,6 +60,8 @@ function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      {/* Fuera de <Routes> a propósito: acompaña a cualquier pantalla, incluido el login. */}
+      {import.meta.env.DEV && <EnvBadge />}
     </BrowserRouter>
   )
 }

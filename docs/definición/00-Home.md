@@ -62,6 +62,10 @@ Roadmap completo → [[roadmap]]
 
 - [[data-model-registry]] — colecciones, índice de numeración, diagrama ER acumulativo
 
+## 🛠️ Desarrollo
+
+- [[ambiente-local]] — stack de Supabase en Docker para probar sin tocar producción
+
 ## 🧩 Templates
 
 - `templates/template-requerimiento.md`
