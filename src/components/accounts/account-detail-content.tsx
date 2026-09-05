@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAccount } from '@/hooks/use-account'
 import { useMsiPlans } from '@/hooks/use-msi-plans'
 import { ACCOUNT_TYPE_LABELS, computeAvailableCredit, formatCurrency } from '@/lib/accounts'
+import { formatDate } from '@/lib/dates'
 import { supabase } from '@/lib/supabase'
 
 // Contenido de detalle de cuenta (CU-003) — compartido entre la página de Settings
@@ -162,7 +163,7 @@ export function AccountDetailContent({ accountId }: { accountId: string | undefi
                   <div>
                     <p className="text-sm text-card-foreground">{movement.concepto}</p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(movement.fecha).toLocaleDateString()}
+                      {formatDate(movement.fecha)}
                     </p>
                   </div>
                   <MovementAmount monto={movement.monto} />

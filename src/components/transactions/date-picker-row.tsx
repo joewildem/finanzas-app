@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Calendar01Icon } from '@hugeicons/core-free-icons'
-import { format } from 'date-fns'
 
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { formatDate } from '@/lib/dates'
 
 // Fila "selection-card" para Date — el trigger conserva el mismo lenguaje visual que Category/
 // Account (ícono + etiqueta a la izquierda, valor a la derecha); el panel ahora es el Calendar de
@@ -28,7 +28,7 @@ export function DatePickerRow({ value, onChange }: { value: Date; onChange: (dat
           </span>
           <span className="text-sm font-medium text-foreground">Date</span>
         </span>
-        <span className="text-sm text-foreground">{format(value, 'd MMM yyyy')}</span>
+        <span className="text-sm text-foreground">{formatDate(value)}</span>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-fit p-0">
         <Calendar

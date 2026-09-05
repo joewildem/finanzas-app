@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Clock01Icon, MoreVerticalIcon } from '@hugeicons/core-free-icons'
-import { format, parseISO } from 'date-fns'
 import { Link } from 'react-router-dom'
 
 import { ArchiveDebtDialog } from '@/components/debts/archive-debt-dialog'
@@ -17,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatCurrency } from '@/lib/accounts'
+import { formatDate } from '@/lib/dates'
 import {
   computeMonthsRemaining,
   computePercentPagado,
@@ -101,7 +101,7 @@ export function DebtCard({
         {debt.fecha_liquidacion_estimada && (
           <div className="flex w-fit items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
             <HugeiconsIcon icon={Clock01Icon} className="size-3.5" />
-            {format(parseISO(debt.fecha_liquidacion_estimada), 'MMM d, yyyy')}
+            {formatDate(debt.fecha_liquidacion_estimada)}
           </div>
         )}
 

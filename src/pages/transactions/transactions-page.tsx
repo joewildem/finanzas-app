@@ -22,6 +22,7 @@ import { useCategoryGroups } from '@/hooks/use-category-groups'
 import { useTransactions, type TransactionWithRelations } from '@/hooks/use-transactions'
 import { useAddTransaction } from '@/lib/add-transaction-context'
 import { getCategoryIcon } from '@/lib/category-icons'
+import { formatDate } from '@/lib/dates'
 import { supabase } from '@/lib/supabase'
 import { findTransactionErrorCodeInMessage, type TransactionErrorCode } from '@/lib/transaction-errors'
 import { TRANSACTION_TYPE_ICONS, TRANSACTION_TYPE_LABELS, type TransactionType } from '@/lib/transactions'
@@ -338,7 +339,7 @@ export function TransactionsPage() {
                       <div>
                         <p className="text-sm text-card-foreground">{label}</p>
                         <p className="text-xs text-muted-foreground">
-                          {transaction.account?.nombre ?? '—'} · {format(new Date(transaction.fecha), 'd MMM yyyy')}
+                          {transaction.account?.nombre ?? '—'} · {formatDate(transaction.fecha)}
                         </p>
                       </div>
                     </div>

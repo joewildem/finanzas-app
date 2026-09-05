@@ -9,6 +9,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { NetworthHistoryPoint } from '@/hooks/use-networth-history'
 import { formatCurrency } from '@/lib/accounts'
+import { formatDate } from '@/lib/dates'
 import { NETWORTH_PERIOD_LABELS, type NetworthPeriod } from '@/lib/networth'
 
 const PERIODS: NetworthPeriod[] = ['1m', '6m', 'ytd', '1y', 'all', 'custom']
@@ -123,7 +124,7 @@ function CustomDatePicker({
         }
       >
         <span className="text-muted-foreground">{label}</span>
-        <span>{format(value, 'd MMM yyyy')}</span>
+        <span>{formatDate(value)}</span>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-fit p-0">
         <Calendar

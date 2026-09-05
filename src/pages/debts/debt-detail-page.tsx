@@ -15,6 +15,7 @@ import { useDebt } from '@/hooks/use-debt'
 import { MovementAmount } from '@/components/movement-amount'
 import { formatCurrency } from '@/lib/accounts'
 import { useAddTransaction } from '@/lib/add-transaction-context'
+import { formatDate } from '@/lib/dates'
 import {
   computeMonthsRemaining,
   computePercentPagado,
@@ -73,7 +74,7 @@ export function DebtDetailPage() {
             <p className="text-sm text-muted-foreground">
               {DEBT_TYPE_LABELS[debt.tipo]} · {formatCurrency(debt.monto_original)} original
               {debt.fecha_liquidacion_estimada &&
-                ` · est. payoff ${new Date(debt.fecha_liquidacion_estimada).toLocaleDateString()}`}
+                ` · est. payoff ${formatDate(debt.fecha_liquidacion_estimada)}`}
             </p>
           </div>
         </div>
@@ -142,7 +143,7 @@ export function DebtDetailPage() {
                       {payment.account?.nombre ?? 'Unknown account'}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(payment.fecha).toLocaleDateString()} · Principal{' '}
+                      {formatDate(payment.fecha)} · Principal{' '}
                       {formatCurrency(payment.monto_capital ?? 0)} · Interest{' '}
                       {formatCurrency(payment.monto_interes ?? 0)}
                     </p>

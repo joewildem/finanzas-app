@@ -5,6 +5,7 @@ import type { DateRange } from 'react-day-picker'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { formatDate, formatDateShort } from '@/lib/dates'
 
 export type DateRangePreset =
   | 'all'
@@ -78,9 +79,9 @@ export function DateRangeFilter({ onChange }: { onChange: (value: DateRangeValue
 
   const customLabel =
     customRange.from && customRange.to
-      ? `${format(customRange.from, 'd MMM')} – ${format(customRange.to, 'd MMM yyyy')}`
+      ? `${formatDateShort(customRange.from)} – ${formatDate(customRange.to)}`
       : customRange.from
-        ? `${format(customRange.from, 'd MMM yyyy')} – …`
+        ? `${formatDate(customRange.from)} – …`
         : 'Pick dates'
 
   return (

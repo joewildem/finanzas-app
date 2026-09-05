@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { formatDate, parseDate } from '@/lib/dates'
 import { DEBT_TYPE_LABELS, type DebtType } from '@/lib/debts'
 import { type DebtErrorCode } from '@/lib/debt-errors'
 
@@ -179,12 +180,12 @@ export function DebtForm({
                     }
                   >
                     <HugeiconsIcon icon={Calendar01Icon} className="size-4 text-muted-foreground" />
-                    {field.value ? format(new Date(field.value), 'd MMM yyyy') : 'No estimated date'}
+                    {field.value ? formatDate(field.value) : 'No estimated date'}
                   </PopoverTrigger>
                   <PopoverContent align="start" className="w-fit p-0">
                     <Calendar
                       mode="single"
-                      selected={field.value ? new Date(field.value) : undefined}
+                      selected={field.value ? parseDate(field.value) : undefined}
                       onSelect={(date) => date && field.onChange(format(date, 'yyyy-MM-dd'))}
                     />
                   </PopoverContent>

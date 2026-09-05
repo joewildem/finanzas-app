@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { formatDate, parseDate } from '@/lib/dates'
 import { type SavingsErrorCode } from '@/lib/savings-errors'
 import { DEFAULT_GOAL_EMOJI } from '@/lib/savings-goals'
 
@@ -132,12 +133,12 @@ export function SavingsGoalForm({
                   }
                 >
                   <HugeiconsIcon icon={Calendar01Icon} className="size-4 text-muted-foreground" />
-                  {field.value ? format(new Date(field.value), 'd MMM yyyy') : 'No target date'}
+                  {field.value ? formatDate(field.value) : 'No target date'}
                 </PopoverTrigger>
                 <PopoverContent align="start" className="w-fit p-0">
                   <Calendar
                     mode="single"
-                    selected={field.value ? new Date(field.value) : undefined}
+                    selected={field.value ? parseDate(field.value) : undefined}
                     onSelect={(date) => date && field.onChange(format(date, 'yyyy-MM-dd'))}
                   />
                 </PopoverContent>

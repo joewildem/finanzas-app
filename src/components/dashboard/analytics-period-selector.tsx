@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { format } from 'date-fns'
 
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { PERIOD_LABELS, type Period } from '@/lib/date-periods'
+import { formatDate } from '@/lib/dates'
 
 const PERIODS: Period[] = ['1m', '6m', 'ytd', '1y', 'all', 'custom']
 
@@ -77,7 +77,7 @@ function CustomDatePicker({
         }
       >
         <span className="text-muted-foreground">{label}</span>
-        <span>{format(value, 'd MMM yyyy')}</span>
+        <span>{formatDate(value)}</span>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-fit p-0">
         <Calendar
