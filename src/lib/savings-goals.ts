@@ -1,4 +1,4 @@
-import { differenceInCalendarMonths, parseISO } from 'date-fns'
+import { differenceInCalendarDays, differenceInCalendarMonths, parseISO } from 'date-fns'
 
 export type SavingsGoalStatus = 'active' | 'archived'
 
@@ -40,4 +40,35 @@ export function computeMontoRestante(montoAportadoActual: number, montoObjetivo:
 export function computeMonthsRemaining(fechaLimite: string | null): number | null {
   if (!fechaLimite) return null
   return Math.max(0, differenceInCalendarMonths(parseISO(fechaLimite), new Date()))
+}
+
+export interface SavingsPace {
+  daysRemaining: number
+  perDay: number
+  perWeek: number
+  perMonth: number
+}
+
+// Ritmo necesario para llegar al objetivo en la fecha límite: lo que falta repartido entre los días
+// que quedan. Es una guía de seguimiento y nada más — no toca transacciones, presupuesto ni el
+// avance de la meta, y se recorre sola conforme pasan los días, así que el número de hoy no es el
+// de mañana.
+//
+// La semana son 7 días y el mes 30, literal: no es el promedio real de un mes (30.44) ni el conteo
+// de calendario. El valor de una cifra de referencia está en que el usuario pueda rehacerla de
+// cabeza, y "por día por 30" cumple eso mientras que 30.44 no.
+//
+// Devuelve null cuando no hay fecha límite o cuando ya no quedan días: repartir entre cero no
+// significa nada, y forzar un número ahí sería inventarlo.
+export function computeSavingsPace(
+  montoRestante: number,
+  fechaLimite: string | null,
+  today: Date = new Date(),
+): SavingsPace | null {
+  if (!fechaLimite) return null
+  const daysRemaining = differenceInCalendarDays(parseISO(fechaLimite), today)
+  if (daysRemaining <= 0) return null
+  // El restante puede venir negativo si la meta ya se superó; ahí lo que falta ahorrar es cero.
+  const perDay = Math.max(0, montoRestante) / daysRemaining
+  return { daysRemaining, perDay, perWeek: perDay * 7, perMonth: perDay * 30 }
 }

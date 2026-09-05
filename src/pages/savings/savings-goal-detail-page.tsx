@@ -14,11 +14,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useSavingsGoal } from '@/hooks/use-savings-goal'
 import { formatCurrency } from '@/lib/accounts'
 import { useAddTransaction } from '@/lib/add-transaction-context'
+import { formatDate } from '@/lib/dates'
 import {
   computeMonthsRemaining,
   computeMontoAportadoActual,
   computeMontoRestante,
   computePercent,
+  computeSavingsPace,
 } from '@/lib/savings-goals'
 import { supabase } from '@/lib/supabase'
 import { TRANSACTION_TYPE_LABELS } from '@/lib/transactions'
@@ -57,6 +59,14 @@ export function SavingsGoalDetailPage() {
   const percent = computePercent(aportado, goal.monto_objetivo)
   const restante = computeMontoRestante(aportado, goal.monto_objetivo)
   const monthsRemaining = computeMonthsRemaining(goal.fecha_limite)
+  const pace = computeSavingsPace(restante, goal.fecha_limite)
+  const paceRows = pace
+    ? [
+        { label: 'Need to save per day', amount: pace.perDay },
+        { label: 'Need to save per week', amount: pace.perWeek },
+        { label: 'Need to save per month', amount: pace.perMonth },
+      ]
+    : []
 
   return (
     <div className="flex flex-col gap-6">
@@ -72,7 +82,7 @@ export function SavingsGoalDetailPage() {
             </div>
             <p className="text-sm text-muted-foreground">
               {formatCurrency(goal.monto_objetivo)} target
-              {goal.fecha_limite && ` · by ${new Date(goal.fecha_limite).toLocaleDateString()}`}
+              {goal.fecha_limite && ` · by ${formatDate(goal.fecha_limite)}`}
             </p>
           </div>
         </div>
@@ -134,6 +144,40 @@ export function SavingsGoalDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Ritmo de ahorro — solo aparece si la meta tiene fecha límite, porque sin fecha no hay
+          entre qué repartir. Es seguimiento puro: no se compara contra lo aportado este mes ni
+          contra el presupuesto, solo dice cuánto tendría que entrar por día, semana y mes para
+          llegar a tiempo. */}
+      {goal.fecha_limite && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Savings pace</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col">
+            {pace === null ? (
+              <p className="py-2 text-sm text-muted-foreground">
+                No days left before the target date, so there is nothing to spread out.
+              </p>
+            ) : (
+              <>
+                <div className="flex flex-col divide-y divide-border">
+                  {paceRows.map((row) => (
+                    <div key={row.label} className="flex items-center justify-between gap-4 py-3">
+                      <p className="text-sm text-card-foreground">{row.label}</p>
+                      <p className="font-mono text-sm text-card-foreground">{formatCurrency(row.amount)}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="pt-3 text-xs text-muted-foreground">
+                  {formatCurrency(Math.max(0, restante))} left over {pace.daysRemaining} days, until{' '}
+                  {formatDate(goal.fecha_limite)}. A week counts as 7 days and a month as 30.
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Movement history</CardTitle>
@@ -148,8 +192,7 @@ export function SavingsGoalDetailPage() {
                   <div>
                     <p className="text-sm text-card-foreground">{TRANSACTION_TYPE_LABELS[movement.tipo]}</p>
                     <p className="text-xs text-muted-foreground">
-                      {movement.account?.nombre ?? 'Unknown account'} ·{' '}
-                      {new Date(movement.fecha).toLocaleDateString()}
+                      {movement.account?.nombre ?? 'Unknown account'} · {formatDate(movement.fecha)}
                     </p>
                   </div>
                   <MovementAmount monto={movement.monto} />
