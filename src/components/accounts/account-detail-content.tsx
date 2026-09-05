@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { CreditCardMsiSection } from '@/components/accounts/credit-card-msi-section'
+import { MovementAmount } from '@/components/movement-amount'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAccount } from '@/hooks/use-account'
 import { useMsiPlans } from '@/hooks/use-msi-plans'
@@ -164,11 +165,7 @@ export function AccountDetailContent({ accountId }: { accountId: string | undefi
                       {new Date(movement.fecha).toLocaleDateString()}
                     </p>
                   </div>
-                  <p
-                    className={`font-mono text-sm ${movement.monto < 0 ? 'text-destructive' : 'text-card-foreground'}`}
-                  >
-                    {formatCurrency(movement.monto)}
-                  </p>
+                  <MovementAmount monto={movement.monto} />
                 </div>
               ))}
             </div>

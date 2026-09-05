@@ -12,6 +12,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { GoalProgressRing } from '@/components/savings/goal-progress-ring'
 import { useDebt } from '@/hooks/use-debt'
+import { MovementAmount } from '@/components/movement-amount'
 import { formatCurrency } from '@/lib/accounts'
 import { useAddTransaction } from '@/lib/add-transaction-context'
 import {
@@ -146,7 +147,7 @@ export function DebtDetailPage() {
                       {formatCurrency(payment.monto_interes ?? 0)}
                     </p>
                   </div>
-                  <p className="font-mono text-sm text-destructive">{formatCurrency(payment.monto)}</p>
+                  <MovementAmount monto={payment.monto} />
                 </div>
               ))}
             </div>

@@ -7,6 +7,7 @@ import { GoalProgressRing } from '@/components/savings/goal-progress-ring'
 import { SavingsGoalFormDialog } from '@/components/savings/savings-goal-form-dialog'
 import { WithdrawGoalDialog } from '@/components/savings/withdraw-goal-dialog'
 import { EmptyState } from '@/components/empty-state'
+import { MovementAmount } from '@/components/movement-amount'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -151,11 +152,7 @@ export function SavingsGoalDetailPage() {
                       {new Date(movement.fecha).toLocaleDateString()}
                     </p>
                   </div>
-                  <p
-                    className={`font-mono text-sm ${movement.monto < 0 ? 'text-destructive' : 'text-card-foreground'}`}
-                  >
-                    {formatCurrency(movement.monto)}
-                  </p>
+                  <MovementAmount monto={movement.monto} />
                 </div>
               ))}
             </div>

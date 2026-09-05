@@ -61,3 +61,14 @@ export function formatCurrency(amount: number): string {
     currency: 'USD',
   }).format(amount)
 }
+
+// Igual que `formatCurrency` pero con el signo siempre explícito ("+$4,100.00" / "-$890.00"). Se usa
+// en el historial de movimientos, donde el signo es la información principal de la fila: distingue de
+// un vistazo lo que entró de lo que salió. El cero no lleva signo.
+export function formatCurrencySigned(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    signDisplay: 'exceptZero',
+  }).format(amount)
+}

@@ -11,6 +11,7 @@ import { AddTransactionDialog } from '@/components/transactions/add-transaction-
 import { DateRangeFilter, type DateRangeValue } from '@/components/transactions/date-range-filter'
 import { DeleteTransactionDialog } from '@/components/transactions/delete-transaction-dialog'
 import { EmptyState } from '@/components/empty-state'
+import { MovementAmount } from '@/components/movement-amount'
 import { TransactionErrorAlert } from '@/components/transaction-error-alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -19,13 +20,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAccounts } from '@/hooks/use-accounts'
 import { useCategoryGroups } from '@/hooks/use-category-groups'
 import { useTransactions, type TransactionWithRelations } from '@/hooks/use-transactions'
-import { formatCurrency } from '@/lib/accounts'
 import { useAddTransaction } from '@/lib/add-transaction-context'
 import { getCategoryIcon } from '@/lib/category-icons'
 import { supabase } from '@/lib/supabase'
 import { findTransactionErrorCodeInMessage, type TransactionErrorCode } from '@/lib/transaction-errors'
 import { TRANSACTION_TYPE_ICONS, TRANSACTION_TYPE_LABELS, type TransactionType } from '@/lib/transactions'
-import { cn } from '@/lib/utils'
 
 const TYPE_FILTER_OPTIONS: { value: TransactionType | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -344,14 +343,7 @@ export function TransactionsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
-                      <p
-                        className={cn(
-                          'mr-1 font-mono text-sm',
-                          transaction.monto < 0 ? 'text-destructive' : 'text-card-foreground',
-                        )}
-                      >
-                        {formatCurrency(transaction.monto)}
-                      </p>
+                      <MovementAmount monto={transaction.monto} className="mr-1" />
                       {!isAdjustment && !selectionMode && (
                         <>
                           {!isMsiPurchase && (
