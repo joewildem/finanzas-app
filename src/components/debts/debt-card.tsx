@@ -18,7 +18,6 @@ import {
 import { formatCurrency } from '@/lib/accounts'
 import { formatDate } from '@/lib/dates'
 import {
-  computeMonthsRemaining,
   computePercentPagado,
   computeSaldoActual,
   DEBT_TYPE_ICONS,
@@ -28,10 +27,11 @@ import { supabase } from '@/lib/supabase'
 import { formatPercent } from '@/lib/utils'
 
 // CU-056 — card de listado, mismo layout que SavingsGoalCard: header (ícono por tipo + nombre +
-// menú de acciones), pill de fecha estimada de liquidación, fila principal (saldo + "from
-// {monto_original}" a la izquierda, anillo de % pagado a la derecha), separador, fila de cierre
-// (restante + meses restantes). Stretched link en el nombre para navegar al detalle sin anidar
-// elementos interactivos.
+// menú de acciones), fila principal (saldo + "from {monto_original}" a la izquierda, anillo de %
+// pagado a la derecha), separador, fila de cierre (restante a la izquierda, pill de fecha estimada
+// de liquidación a la derecha). La pill va en el pie por la misma razón que en metas: en un renglón
+// propio hacía más alta a la card con fecha y el grid dejaba a las demás con un hueco abajo.
+// Stretched link en el nombre para navegar al detalle sin anidar elementos interactivos.
 export function DebtCard({
   debt,
   capitalPagos,
@@ -47,7 +47,6 @@ export function DebtCard({
 
   const saldoActual = computeSaldoActual(debt, capitalPagos)
   const percent = computePercentPagado(saldoActual, debt.monto_original)
-  const monthsRemaining = computeMonthsRemaining(debt.fecha_liquidacion_estimada)
 
   async function handleReactivate() {
     await supabase.from('debts').update({ status: 'active' }).eq('id', debt.id).eq('status', 'archived')
@@ -98,13 +97,6 @@ export function DebtCard({
           </DropdownMenu>
         </div>
 
-        {debt.fecha_liquidacion_estimada && (
-          <div className="flex w-fit items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
-            <HugeiconsIcon icon={Clock01Icon} className="size-3.5" />
-            {formatDate(debt.fecha_liquidacion_estimada)}
-          </div>
-        )}
-
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-col gap-1.5">
             <p className="font-mono text-2xl font-medium text-card-foreground">
@@ -118,13 +110,16 @@ export function DebtCard({
           </GoalProgressRing>
         </div>
 
-        <div className="flex items-center justify-between border-t border-border pt-3">
+        <div className="flex min-h-6 items-center justify-between gap-2 border-t border-border pt-3">
           <p className="text-sm">
             <span className="font-mono font-medium text-card-foreground">{formatCurrency(saldoActual)}</span>{' '}
             <span className="text-muted-foreground">remaining</span>
           </p>
-          {monthsRemaining !== null && (
-            <p className="text-xs text-muted-foreground">{monthsRemaining} months left</p>
+          {debt.fecha_liquidacion_estimada && (
+            <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+              <HugeiconsIcon icon={Clock01Icon} className="size-3.5" />
+              {formatDate(debt.fecha_liquidacion_estimada)}
+            </div>
           )}
         </div>
       </CardContent>
