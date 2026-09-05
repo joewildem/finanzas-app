@@ -15,6 +15,8 @@ Toda la documentación de producto vive en `docs/` y está organizada como un va
 - **Librería de iconos: Hugeicons, siempre.** Paquetes: `@hugeicons/react` (renderer) + `@hugeicons/core-free-icons` (set gratuito, estilo Stroke Rounded). Nunca uses lucide-react ni ninguna otra librería, aunque un componente de shadcn/ui la traiga por defecto en su ejemplo — reemplázala por el ícono equivalente de Hugeicons.
 - Cuidado con el nombre del paquete: existe uno viejo y sin mantenimiento llamado `hugeicons-react` (sin scope `@`) que algunas herramientas de IA instalan por error. El correcto es `@hugeicons/react`.
 - Patrón de uso: `<HugeiconsIcon icon={Home01Icon} size={24} color="currentColor" strokeWidth={1.5} />`, importando cada ícono específico desde `@hugeicons/core-free-icons` — no importes el paquete completo.
+- **Formato de fecha: `DD MMM, YYYY`** (ej. `31 Dec, 2027`), en toda la interfaz sin excepción. Vive en `src/lib/dates.ts` (`formatDate`, y `formatDateShort` para el extremo izquierdo de un rango): ninguna pantalla decide su propio formato ni usa `toLocaleDateString`. Los formatos de almacenamiento (`yyyy-MM-dd`) y las etiquetas de mes de gráficas y Presupuesto (`MMM`, `MMMM yyyy`) son otra cosa y no pasan por ahí.
+- **Una fecha que viene del backend se parsea con `parseDate`, nunca con `new Date(string)`.** Una fecha sin hora (`'2027-12-31'`) pasada a `new Date` se interpreta en UTC, y en México (UTC-6) se renderiza como el día anterior. Ese bug estuvo vivo en los historiales de cuenta, meta y deuda y en dos calendarios hasta el 2026-09-05.
 
 ## Reglas no negociables al trabajar en `docs/prd/`
 

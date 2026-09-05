@@ -200,20 +200,20 @@ _Índices_
 
 **Descripción del caso de uso**
 
-Esta funcionalidad permitirá al usuario consultar todas sus metas de ahorro en una vista de tarjetas, mostrando para cada una su emoji, nombre, fecha límite (si existe), monto aportado, monto objetivo, porcentaje ahorrado, monto restante y tiempo restante hasta la fecha límite (si existe). El listado se organiza en dos pestañas: "En progreso" (`status = active`) y "Completadas" (`status = archived`).
+Esta funcionalidad permitirá al usuario consultar todas sus metas de ahorro en una vista de tarjetas, mostrando para cada una su emoji, nombre, monto aportado, monto objetivo, porcentaje ahorrado, monto restante y fecha límite (si existe). El listado se organiza en dos pestañas: "En progreso" (`status = active`) y "Completadas" (`status = archived`).
 
 **Flujo principal**
 
 1. El usuario accede a la sección "Metas".
 2. El sistema recupera las metas del usuario autenticado con `status = active` (pestaña "En progreso" por defecto).
-3. Para cada meta, el sistema calcula `monto_aportado_actual`, `porcentaje_ahorrado`, `monto_restante` y, si aplica, el tiempo restante hasta `fecha_limite`.
+3. Para cada meta, el sistema calcula `monto_aportado_actual`, `porcentaje_ahorrado` y `monto_restante`.
 4. El sistema muestra las tarjetas ordenadas por fecha límite más próxima primero; las metas sin fecha límite se muestran al final.
 5. El usuario puede alternar a la pestaña "Completadas" para ver las metas archivadas.
 
 **Flujos alternativos / casos borde**
 
 - Si el usuario no tiene metas registradas, el sistema muestra un estado vacío invitando a crear la primera meta (CU-042).
-- Si una meta no tiene `fecha_limite`, la card se muestra sin el dato de tiempo restante, sin afectar el resto de los cálculos.
+- Si una meta no tiene `fecha_limite`, la card se muestra sin la pill de fecha, sin afectar el resto de los cálculos ni la altura de la card (RN-290).
 - Si `monto_aportado_actual` supera `monto_objetivo`, el porcentaje se muestra sin tope (ej. 150%) y `monto_restante` se muestra en $0 en la card (el cálculo interno conserva el valor real, incluyendo el negativo, para no perder precisión en futuros cómputos).
 
 **Precondiciones**
@@ -235,7 +235,8 @@ Esta funcionalidad permitirá al usuario consultar todas sus metas de ahorro en 
 - RN-126: `monto_aportado_actual` se calcula en tiempo de consulta como `monto_inicial` menos la suma con signo de `monto` de todas las transacciones (`aportacion_meta`, `retiro_meta`) ligadas a esa meta mediante `meta_id` — nunca se persiste, mismo patrón que `saldo_actual`/`disponible` en otros módulos. La resta (en vez de suma) es porque el signo de `monto` está definido desde la perspectiva de la cuenta, no de la meta: una aportación resta de la cuenta (negativo) y por tanto suma a la meta; un retiro suma a la cuenta (positivo) y por tanto resta de la meta.
 - RN-127: `porcentaje_ahorrado = monto_aportado_actual / monto_objetivo`; no tiene tope superior — puede superar el 100% si el usuario sigue aportando después de alcanzar el objetivo.
 - RN-128: `monto_restante = monto_objetivo - monto_aportado_actual`; si el resultado es negativo (meta superada), se muestra como $0 en la card.
-- RN-129: si la meta no tiene `fecha_limite`, no se calcula ni se muestra tiempo restante.
+- RN-129: si la meta no tiene `fecha_limite`, no se calcula ni se muestra tiempo restante en el detalle (CU-044), ni pill de fecha en la card (RN-290).
+- RN-290: la card del listado muestra la `fecha_limite` como pill en su renglón de cierre, a la derecha del monto restante — no el tiempo restante, que vive únicamente en el detalle (CU-044). La pill ocupa ese renglón y no uno propio, y el renglón conserva una altura mínima fija: en un grid las cards de una misma fila se estiran a la más alta, de modo que una meta con fecha hacía crecer a todas las demás y les dejaba un hueco al pie. Con la pill dentro del renglón de cierre, una meta con fecha y una sin ella miden exactamente lo mismo. Mismo criterio en la card de deuda (RN-293 de [[creditos-deudas]]).
 - RN-130: la pestaña "Completadas" corresponde exclusivamente a `status = archived`, no a haber alcanzado el `monto_objetivo` — una meta que supera su objetivo permanece en "En progreso" hasta que el usuario decida archivarla manualmente (CU-046).
 
 **Casos de uso derivados identificados**
@@ -315,7 +316,7 @@ Reutiliza `(user_id, status)` definido en CU-042.
 |#|Categoría|Escenario|Input|Resultado esperado|HTTP|
 |---|---|---|---|---|---|
 |1|Flujo exitoso|Listar metas activas con datos completos|Usuario con 3 metas activas|Listado con campos calculados correctos|200|
-|2|Flujo exitoso|Meta sin fecha límite|Meta con `fecha_limite=null`|`meses_restantes=null`, resto de campos normal|200|
+|2|Flujo exitoso|Meta sin fecha límite|Meta con `fecha_limite=null`|Card sin pill de fecha, con la misma altura que una card con fecha|200|
 |3|Flujo exitoso|Meta que superó su objetivo|`monto_aportado_actual > monto_objetivo`|`porcentaje_ahorrado > 1`, `monto_restante=0` en la card|200|
 |4|Flujo exitoso|Pestaña "Completadas"|`status=archived`|Solo metas archivadas|200|
 |5|Flujo exitoso|Usuario sin metas|Usuario nuevo|Listado vacío, sin error|200|
@@ -347,6 +348,7 @@ Esta funcionalidad permitirá al usuario consultar el detalle completo de una me
 **Flujos alternativos / casos borde**
 
 - Si la meta no tiene movimientos (recién creada), el historial se muestra vacío; el `monto_inicial` se muestra como el punto de partida del progreso, pero no aparece como un renglón del historial, ya que no genera transacción (RN-123).
+- Si la meta no tiene `fecha_limite`, o si esa fecha ya llegó o pasó, el bloque de ritmo de ahorro no se muestra (RN-292).
 
 **Precondiciones**
 
@@ -363,6 +365,8 @@ No aplica — este CU no captura datos nuevos, solo consulta un registro existen
 **Reglas de negocio**
 
 - RN-131: el historial de movimientos de una meta incluye todas las transacciones con `tipo = aportacion_meta` o `tipo = retiro_meta` cuyo `meta_id` corresponda a esta meta, mostrando la cuenta involucrada en cada una (`account_id`) — mismo patrón que el historial de movimientos de una cuenta (CU-003 de [[cuentas]]).
+- RN-291: el detalle de una meta con `fecha_limite` definida muestra el ritmo de ahorro necesario para llegar al objetivo en esa fecha: `monto_restante ÷ días entre la fecha actual y fecha_limite` como monto diario, y ese monto diario multiplicado por 7 y por 30 como monto semanal y mensual. El factor mensual es 30 días exactos, no el promedio real del calendario (30.44) ni el conteo de meses naturales: es una cifra de referencia, y su utilidad depende de que el usuario pueda reproducirla de memoria. Se calcula en tiempo de consulta y no se persiste — mismo criterio que `monto_aportado_actual` (RN-126). Es puramente informativo: no genera transacciones, no alimenta [[presupuesto]] y no altera el progreso de la meta.
+- RN-292: el ritmo de ahorro no se muestra si la meta no tiene `fecha_limite`, ni si la fecha límite ya llegó o pasó (cero días restantes o menos) — repartir entre cero días no produce una cifra con significado, y el sistema no la inventa. Si `monto_restante` es negativo porque la meta se superó (RN-128), el ritmo se calcula sobre $0, no sobre el excedente.
 
 **Casos de uso derivados identificados**
 
@@ -449,9 +453,13 @@ Reutiliza `(meta_id, fecha desc) WHERE meta_id IS NOT NULL`, definido formalment
 |---|---|---|---|---|---|
 |1|Flujo exitoso|Ver detalle con movimientos|Meta con aportaciones y retiros previos|Detalle completo, historial ordenado cronológicamente|200|
 |2|Flujo exitoso|Ver detalle sin movimientos|Meta recién creada|Historial vacío, `monto_aportado_actual = monto_inicial`|200|
-|3|Recurso no encontrado|`id` inexistente o de otro usuario|`id` inválido|`BIZ_026`|404|
-|4|Autenticación / autorización|Token expirado o ausente|Sin JWT válido|`AUTH_001`|401|
-|5|Error del sistema|Falla de base de datos|Simulado|`SYS_001`|500|
+|3|Flujo exitoso|Ver ritmo de ahorro con fecha límite futura|`monto_restante` = $121,708.66, `fecha_limite` a 482 días|Ritmo diario $252.51, semanal $1,767.55, mensual $7,575.23|200|
+|4|Caso borde|Ver detalle con fecha límite alcanzada o pasada|`fecha_limite` = hoy o anterior|El bloque de ritmo no muestra montos|200|
+|5|Caso borde|Ver detalle sin fecha límite|`fecha_limite = null`|El bloque de ritmo no se muestra|200|
+|6|Caso borde|Ver ritmo con la meta superada|`monto_aportado_actual > monto_objetivo`|Ritmo de $0.00 en los tres periodos, no un negativo|200|
+|7|Recurso no encontrado|`id` inexistente o de otro usuario|`id` inválido|`BIZ_026`|404|
+|8|Autenticación / autorización|Token expirado o ausente|Sin JWT válido|`AUTH_001`|401|
+|9|Error del sistema|Falla de base de datos|Simulado|`SYS_001`|500|
 
 **Referencia de diseño**
 
@@ -1103,6 +1111,7 @@ Ver documento adjunto de actualización del registro (`registro-actualizacion-ah
 |---|---|---|---|
 |2026-08-22|Se crea el módulo Ahorros y Metas: colección `savings_goals` (meta con nombre, emoji, monto objetivo, monto inicial opcional, fecha límite opcional); se habilita el flujo de captura de `aportacion_meta` (ya reservado) y se introduce `retiro_meta` (nuevo), ambos como documento único vía el nuevo campo `transactions.meta_id`, sin el patrón de dos documentos enlazados que sí usan transferencia y pago a tarjeta. Se agregan CU-042 a CU-048. Una meta es independiente de cualquier cuenta (cubeta libre); su archivado es siempre manual, sin relación con alcanzar el monto objetivo.|CU-042 a CU-048|Se actualiza [[data-model-registry]] con la colección `savings_goals`, la extensión de `transactions` y `budgets`, nuevas relaciones, diagrama ER e índice de numeración. Se modifica [[presupuesto]]: se retira `categoria_reservada` (con `RN-070`, `VALIDATION_019`, y su índice) y se sustituye por `budgets.meta_id`, un renglón presupuestable por meta activa. Se modifica [[transacciones]]: se corrige el resumen del módulo, se agrega `retiro_meta` al enum `tipo`, se corrige el alcance de `transaccion_relacionada_id`, y CU-017 gana `meta_id` como campo editable. Queda pendiente, para cuando le toque su turno, corregir `RN-087` de [[reportes]].|
 |2026-08-22|**Corrección de numeración, detectada al iniciar la construcción en código**: este documento se había numerado (CU-035 a CU-041, RN-107 a RN-139, `VALIDATION_023`, `BIZ_022`) sin consultar el índice de numeración real — colisionaba con `CU-035` y `RN-107`–`RN-111` de [[transacciones]] (acciones en lote), `RN-112`–`RN-117` de [[presupuesto]], `RN-118`/`RN-119` de [[categorias]], y `VALIDATION_023`/`BIZ_022` de [[transacciones]] (los 4 ya asignados en sesiones previas de construcción). Se renumeró todo el documento a la siguiente secuencia libre: `CU-035`→`CU-042` … `CU-041`→`CU-048`; `RN-107`→`RN-120` … `RN-139`→`RN-152`; `VALIDATION_023`→`VALIDATION_026`; `BIZ_022`→`BIZ_026`. Ningún otro documento cambió sus propios números — solo se corrigieron las referencias colisionadas dentro de este archivo y en [[data-model-registry]].|CU-042 a CU-048|Se actualiza [[data-model-registry]]: índice de numeración e historial de cambios.|
+|2026-09-05|Ajustes de seguimiento sobre el módulo ya construido, sin cambios de esquema. La card del listado pasa a mostrar la fecha límite como pill en su renglón de cierre, en lugar del tiempo restante, y ese renglón gana una altura mínima fija (RN-290): la pill en un renglón propio hacía más alta a la card con fecha y, al estirarse la fila del grid, dejaba a las demás con un hueco al pie. El detalle de una meta con fecha límite gana el bloque "Savings pace" (RN-291, RN-292): cuánto hay que ahorrar por día, semana y mes para llegar a tiempo, calculado al vuelo y puramente informativo. Se revisa RN-129 en consecuencia.|CU-043, CU-044|Se actualiza [[data-model-registry]]: índice de numeración hasta RN-292. Mismo ajuste de card en [[creditos-deudas]] (RN-293).|
 
 ## Referencias
 

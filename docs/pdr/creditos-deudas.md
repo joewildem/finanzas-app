@@ -282,6 +282,11 @@ pestañas: "Activas" (`status = active`) y "Liquidadas" (`status = archived`).
 - RN-205: el listado se ordena por `fecha_liquidacion_estimada` más próxima primero; las deudas sin
   fecha estimada se muestran al final (mismo criterio de ordenamiento que CU-043 de
   [[ahorros-y-metas]]).
+- RN-293: la card del listado muestra la `fecha_liquidacion_estimada` como pill en su renglón de
+  cierre, a la derecha del monto restante, y ese renglón conserva una altura mínima fija — una deuda
+  con fecha y una sin ella miden exactamente lo mismo. Mismo criterio y misma razón que RN-290 de
+  [[ahorros-y-metas]]: con la pill en un renglón propio, la card con fecha estiraba la fila del grid
+  y dejaba a las demás con un hueco al pie.
 
 **Casos de uso derivados identificados**
 
@@ -1081,6 +1086,7 @@ numeración.
 |Fecha|Cambio|CU afectado|Impacto en otros documentos|
 |---|---|---|---|
 |2026-08-24|Se crea el módulo Créditos y Deudas: tabla `debts` (deuda externa con nombre, tipo, monto original, tasa de interés, pago mensual esperado, día de pago y fecha estimada de liquidación opcional); se introduce el tipo `pago_deuda` en `transactions` como documento único vía el nuevo campo `deuda_id`, con el pago dividido en `monto_capital`/`monto_interes` — el saldo de la deuda solo baja por capital, nunca por interés. Se agregan CU-055 a CU-060. Cada deuda activa gana su propio renglón presupuestable en [[presupuesto]] (`budgets.deuda_id`), igual que cada meta de ahorro. El archivado es siempre manual, sin relación con que el saldo llegue a $0. Con este documento se completan los 9 documentos de `docs/pdr/`, cerrando la fase de Casos de uso y Requerimientos del alcance completo.|CU-055 a CU-060|Se actualiza [[data-model-registry]] con la tabla `debts`, la extensión de `transactions` y `budgets`, nuevas relaciones, diagrama ER e índice de numeración. Se modifica [[presupuesto]]: se agrega `budgets.deuda_id`, un renglón presupuestable por deuda activa, y se revisa `RN-075` (Total por asignar). Se modifica [[transacciones]]: se agrega `pago_deuda` al enum `tipo`, se agregan `deuda_id`/`monto_capital`/`monto_interes`, y CU-017 gana los tres como campos editables.|
+|2026-09-05|Ajuste visual sobre el módulo ya construido, sin cambios de esquema ni de reglas de cálculo: la card del listado pasa a mostrar la fecha estimada de liquidación como pill en su renglón de cierre, con una altura mínima fija en ese renglón (RN-293). Replica el ajuste equivalente de la card de metas (RN-290 de [[ahorros-y-metas]]), hecho el mismo día por la misma razón — la pill en un renglón propio desigualaba la altura de las cards dentro de una fila del grid.|CU-056|Se actualiza [[data-model-registry]]: índice de numeración hasta RN-293.|
 
 ## Referencias
 
