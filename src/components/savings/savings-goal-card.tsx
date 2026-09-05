@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Clock01Icon, MoreVerticalIcon } from '@hugeicons/core-free-icons'
-import { format, parseISO } from 'date-fns'
 import { Link } from 'react-router-dom'
 
 import { ArchiveGoalDialog } from '@/components/savings/archive-goal-dialog'
@@ -18,8 +17,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { formatCurrency } from '@/lib/accounts'
 import { useAddTransaction } from '@/lib/add-transaction-context'
+import { formatDate } from '@/lib/dates'
 import {
-  computeMonthsRemaining,
   computeMontoAportadoActual,
   computeMontoRestante,
   computePercent,
@@ -29,10 +28,11 @@ import { supabase } from '@/lib/supabase'
 import type { Transaction } from '@/lib/transactions'
 import { formatPercent } from '@/lib/utils'
 
-// CU-043 — card de listado, estructura alineada a la referencia de diseño: header (emoji + nombre
-// + menú de acciones), pill de fecha límite, fila principal (aportado + "from {objetivo}" a la
-// izquierda, anillo de progreso a la derecha), separador, fila de cierre (restante + tiempo
-// restante). El nombre es un <Link> cuyo `::before`-equivalente (un span absoluto) cubre toda la
+// CU-043 — card de listado: header (emoji + nombre + menú de acciones), fila principal (aportado +
+// "from {objetivo}" a la izquierda, anillo de progreso a la derecha), separador, fila de cierre
+// (restante a la izquierda, pill de fecha límite a la derecha). La pill vive en el pie y no en un
+// renglón propio para que una meta con fecha y una sin ella midan exactamente lo mismo: en un grid
+// las cards de una fila se estiran a la más alta, y la de la fecha dejaba a las demás con un hueco. El nombre es un <Link> cuyo `::before`-equivalente (un span absoluto) cubre toda la
 // card ("stretched link") para que el click en cualquier punto navegue al detalle sin anidar
 // elementos interactivos — el botón del menú va en un stacking context propio (relative z-10) para
 // no competir con esa superficie de click.
@@ -53,7 +53,6 @@ export function SavingsGoalCard({
   const aportado = computeMontoAportadoActual(goal, movimientos)
   const percent = computePercent(aportado, goal.monto_objetivo)
   const restante = computeMontoRestante(aportado, goal.monto_objetivo)
-  const monthsRemaining = computeMonthsRemaining(goal.fecha_limite)
 
   async function handleReactivate() {
     await supabase.from('savings_goals').update({ status: 'active' }).eq('id', goal.id).eq('status', 'archived')
@@ -111,13 +110,6 @@ export function SavingsGoalCard({
           </DropdownMenu>
         </div>
 
-        {goal.fecha_limite && (
-          <div className="flex w-fit items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
-            <HugeiconsIcon icon={Clock01Icon} className="size-3.5" />
-            {format(parseISO(goal.fecha_limite), 'MMM d, yyyy')}
-          </div>
-        )}
-
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-col gap-1.5">
             <p className="font-mono text-2xl font-medium text-card-foreground">
@@ -131,13 +123,16 @@ export function SavingsGoalCard({
           </GoalProgressRing>
         </div>
 
-        <div className="flex items-center justify-between border-t border-border pt-3">
+        <div className="flex min-h-6 items-center justify-between gap-2 border-t border-border pt-3">
           <p className="text-sm">
             <span className="font-mono font-medium text-card-foreground">{formatCurrency(restante)}</span>{' '}
             <span className="text-muted-foreground">remaining</span>
           </p>
-          {monthsRemaining !== null && (
-            <p className="text-xs text-muted-foreground">{monthsRemaining} months left</p>
+          {goal.fecha_limite && (
+            <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+              <HugeiconsIcon icon={Clock01Icon} className="size-3.5" />
+              {formatDate(goal.fecha_limite)}
+            </div>
           )}
         </div>
       </CardContent>
