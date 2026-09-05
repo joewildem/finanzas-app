@@ -10,16 +10,21 @@ import { useDebts } from '@/hooks/use-debts'
 import { useMonthlyActuals } from '@/hooks/use-monthly-actuals'
 import { useMonthlyDebtActuals } from '@/hooks/use-monthly-debt-actuals'
 import { useMonthlyGoalActuals } from '@/hooks/use-monthly-goal-actuals'
+import { useMsiPayments } from '@/hooks/use-msi-payments'
+import { useMsiPlans } from '@/hooks/use-msi-plans'
 import { useSavingsGoals } from '@/hooks/use-savings-goals'
 import { useAddTransaction } from '@/lib/add-transaction-context'
 import { formatCurrency } from '@/lib/accounts'
 import { findBudgetErrorCodeInMessage, type BudgetErrorCode } from '@/lib/budget-errors'
 import { currentMonthKey } from '@/lib/budgets'
+import { computeInstallmentForMonth, computeMsiMonthIndex } from '@/lib/msi'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 
 const AUTOSAVE_DEBOUNCE_MS = 700
 
+// Los planes MSI no pasan por aquí: su mensualidad se deriva (no se asigna) y lo que sí se captura
+// —cuánto se pagó— vive en `msi_payments`, no en `budgets`. Ver handleChangeMsiPaid.
 function keyToPayload(key: string, monto: number | undefined, goalIds: Set<string>, debtIds: Set<string>) {
   if (goalIds.has(key)) return { category_id: null, meta_id: key, deuda_id: null, monto: monto ?? null }
   if (debtIds.has(key)) return { category_id: null, meta_id: null, deuda_id: key, monto: monto ?? null }
@@ -43,6 +48,20 @@ export function BudgetPage() {
   const { groups } = useCategoryGroups(false)
   const { goals } = useSavingsGoals(false)
   const { debts } = useDebts(false)
+  const { plans: msiPlans, refetch: refetchMsiPlans } = useMsiPlans()
+  const { payments: msiPayments, refetch: refetchMsiPayments } = useMsiPayments(mes)
+
+  // MSI (sin PRD todavía) — un plan solo aparece en Budget en los meses que caen dentro de su
+  // ventana [mes de la compra, mes de la compra + meses). Se recalcula cada vez que cambian los
+  // planes o el mes visible — no hay tabla propia que filtrar por mes en el servidor.
+  const activeMsiPlans = useMemo(() => {
+    if (!msiPlans) return []
+    return msiPlans.flatMap((plan) => {
+      const monthIndex = computeMsiMonthIndex(plan, mes)
+      if (monthIndex === null) return []
+      return [{ plan, monthIndex, installment: computeInstallmentForMonth(plan, mes) ?? 0 }]
+    })
+  }, [msiPlans, mes])
 
   const actuals = useMemo(
     () => ({ ...(categoryActuals ?? {}), ...(goalActuals ?? {}), ...(debtActuals ?? {}) }),
@@ -53,7 +72,8 @@ export function BudgetPage() {
     refetchActuals()
     refetchGoalActuals()
     refetchDebtActuals()
-  }, [refetchActuals, refetchGoalActuals, refetchDebtActuals])
+    refetchMsiPlans()
+  }, [refetchActuals, refetchGoalActuals, refetchDebtActuals, refetchMsiPlans])
 
   // El botón global "Add record" del header (fuera de esta página, vía AddTransactionProvider) no
   // conoce el `refetch` de esta página — se suscribe a cualquier alta exitosa, sin importar desde
@@ -66,8 +86,18 @@ export function BudgetPage() {
 
   const [amounts, setAmounts] = useState<Record<string, number | undefined>>({})
   const [snapshot, setSnapshot] = useState<Record<string, number | undefined>>({})
+  // Espejo local de `msi_payments` para que el input responda de inmediato; se resincroniza con lo
+  // que devuelve el servidor en cada refetch y al cambiar de mes.
+  const [msiPaid, setMsiPaid] = useState<Record<string, number | undefined>>({})
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
   const [errorCode, setErrorCode] = useState<BudgetErrorCode | null>(null)
+
+  // Los pagos se escriben de inmediato (sin debounce), así que adoptar lo que devuelve el servidor
+  // en cada refetch no puede pisar una edición en vuelo — a diferencia de `amounts`, que sí necesita
+  // el sembrado una-vez-por-mes.
+  useEffect(() => {
+    if (msiPayments) setMsiPaid(msiPayments)
+  }, [msiPayments])
 
   const goalIds = useMemo(() => new Set((goals ?? []).map((g) => g.id)), [goals])
   const debtIds = useMemo(() => new Set((debts ?? []).map((d) => d.id)), [debts])
@@ -140,6 +170,23 @@ export function BudgetPage() {
     setAmounts((prev) => ({ ...prev, [key]: value }))
   }
 
+  // El pago de una parcialidad se guarda por su cuenta, no con el lote de `save_budgets`: no vive en
+  // `budgets` (ver keyToPayload). Se escribe en cada edición confirmada, sin debounce propio — es un
+  // campo suelto por plan, no una tabla entera editándose a la vez.
+  async function handleChangeMsiPaid(planId: string, value: number | undefined) {
+    setMsiPaid((prev) => ({ ...prev, [planId]: value }))
+    const { error } = await supabase.rpc('save_msi_payment', {
+      p_msi_transaction_id: planId,
+      p_mes: mes,
+      p_monto: value ?? null,
+    })
+    if (error) {
+      setErrorCode(findBudgetErrorCodeInMessage(error.message) ?? 'SYS_001')
+      return
+    }
+    refetchMsiPayments()
+  }
+
   function handleToggleGroup(groupId: string) {
     setOpenGroups((prev) => ({ ...prev, [groupId]: !(prev[groupId] ?? true) }))
   }
@@ -179,9 +226,14 @@ export function BudgetPage() {
   const investmentTotal = sumGroups(investmentGroups)
   const goalsTotal = (goals ?? []).reduce((sum, goal) => sum + (amounts[goal.id] ?? 0), 0)
   const debtsTotal = (debts ?? []).reduce((sum, debt) => sum + (amounts[debt.id] ?? 0), 0)
-  // RN-075 — ingreso presupuestado menos grupos Outflow, grupos Investment, metas de ahorro activas
-  // y deudas activas.
-  const toAssign = incomeTotal - outflowTotal - investmentTotal - goalsTotal - debtsTotal
+  // MSI se trata igual que Debts para este total — es dinero ya gastado (la tarjeta ya refleja la
+  // deuda completa) que el usuario necesita encontrar espacio para pagar este mes, misma lógica que
+  // un pago de deuda externa. Se usa la mensualidad derivada, no lo capturado como pagado: lo que
+  // reduce el dinero disponible para repartir es el compromiso, no si ya se saldó o no.
+  const msiTotal = activeMsiPlans.reduce((sum, entry) => sum + entry.installment, 0)
+  // RN-075 — ingreso presupuestado menos grupos Outflow, grupos Investment, metas de ahorro activas,
+  // deudas activas y planes MSI activos este mes.
+  const toAssign = incomeTotal - outflowTotal - investmentTotal - goalsTotal - debtsTotal - msiTotal
 
   function handleCopied() {
     seededMesRef.current = null
@@ -237,6 +289,9 @@ export function BudgetPage() {
         onChangeAmount={handleChangeAmount}
         goals={goals ?? []}
         debts={debts ?? []}
+        msiPlans={activeMsiPlans}
+        msiPaid={msiPaid}
+        onChangeMsiPaid={handleChangeMsiPaid}
         emptyMessage="No categories yet."
       />
 

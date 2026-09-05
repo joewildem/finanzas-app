@@ -1,6 +1,6 @@
 ---
 modulo: "Presupuesto"
-status: en progreso
+status: cerrado
 ---
 
 # Requerimientos — Presupuesto
@@ -617,6 +617,7 @@ de `transactions` (definido en [[transacciones]]) y `{ meta_id: 1, fecha: -1 }` 
 | 2026-08-24 | Cambio cruzado desde [[creditos-deudas]]: la nota original "Deudas queda fuera de este módulo" queda desactualizada — se agrega `budgets.deuda_id` (mutuamente excluyente con `category_id`/`meta_id`), un renglón presupuestable por cada deuda activa, igual que cada meta. Se agrega **RN-222** (patrón de upsert/eliminación de `deuda_id`, mismo criterio que `meta_id`) y **RN-223** (el "real" mensual de una deuda suma capital + interés de sus pagos del mes, a diferencia de `saldo_actual` de la deuda que solo resta capital). Se revisan RN-070, RN-071, RN-075, RN-115 (chip de una deuda sigue el criterio de sobregasto, no de sobre-cumplimiento) y CU-019/CU-020/CU-022 (campo `deuda_id`, `BIZ_031` reutilizado, encabezado "Debts" junto a "Goals") para reflejar el cambio. | CU-019, CU-020, CU-022 | Se actualiza [[data-model-registry]]: `budgets.deuda_id`, su índice único parcial, índice de numeración sin cambio (los códigos nuevos se acuñaron en [[creditos-deudas]]) |
 | 2026-08-28 | Cambio cruzado desde [[categorias]] (RN-118 revisada): `investment` se separa de `outflow` como tercer valor de `categories.flujo`, al alinear Analytics de [[dashboard]]. Budget gana una tercera tabla, "Investment", paralela a Inflow/Outflow — mismo componente `BudgetTable` reutilizado (`isIncome=false`, sin `goals`/`debts`), filtrado por `group.flujo === 'investment'`. Se revisan RN-075 (el total por asignar también resta el presupuesto de Investment), RN-113/RN-117 (Investment sigue el criterio de alerta de Outflow, no el de éxito de Inflow). Sin cambio numérico para el catálogo semilla actual — el grupo Investment ya restaba del total por asignar antes, como parte de Outflow. | CU-019, CU-022 | Se actualiza [[data-model-registry]]: enum `category_flow` con `investment` (origen [[categorias]]), sin cambio de numeración |
 
+| 2026-09-04 | Cambio cruzado desde [[msi]]: la tabla "Outflow" gana un cuarto grupo, **"Installments (MSI)"**, con un renglón por cada plan a meses vigente en el mes consultado. Es el único grupo cuyos renglones **invierten el significado de las columnas** (RN-286): "Assigned" es la mensualidad que impone el banco —derivada del calendario del plan, mostrada como texto fijo— y "Current" es el pago capturado a mano, que aquí es el campo editable. La inversión responde a que la mensualidad es un dato y no una decisión, mientras que lo único que el sistema no puede derivar es cuánto se pagó de ella: un abono a la tarjeta es un monto único que no dice a qué plan corresponde. Se revisa **RN-075**: el dinero por repartir resta además el total de mensualidades vigentes del mes, usando la **mensualidad derivada y no el pago capturado** (RN-287) — lo que reduce el dinero disponible es el compromiso, con independencia de si ya se saldó. El pago capturado vive en la tabla nueva `msi_payments` y no en `budgets`: ahí `monto` significa "lo que planeo asignar", y un pago ya ocurrido habría quedado como una fila cuyo monto el presupuesto tendría que ignorar. `budgets` no cambia de esquema — la columna `msi_transaction_id` que introdujo la primera versión del módulo fue retirada por la definitiva. | CU-019, CU-022 | Se actualiza [[data-model-registry]]: tabla `msi_payments`; `budgets` sin cambios netos; numeración acuñada en [[msi]] |
 ## Referencias
 
 - [[estrategia]]
@@ -627,3 +628,4 @@ de `transactions` (definido en [[transacciones]]) y `{ meta_id: 1, fecha: -1 }` 
 - [[ahorros-y-metas]]
 - [[creditos-deudas]]
 - [[backlog]]
+- [[msi]]

@@ -7,6 +7,11 @@ import { monthRange } from '@/lib/budgets'
 // absoluto (RN-038: gasto se guarda negativo, ingreso positivo con signo — abs los hace comparables
 // al `monto` presupuestado, que siempre se captura positivo, RN-057). Calculado al vuelo, nunca
 // persistido — mismo criterio que `accounts.disponible`.
+//
+// Las compras a meses sin intereses no aparecen aquí sin necesidad de excluirlas: son `compra_msi`,
+// un tipo aparte que este filtro por `tipo` ya deja fuera, y ni siquiera llevan categoría. Su
+// mensualidad se cuenta por separado en el renglón de MSI de Presupuesto (ver budget-page.tsx), de
+// forma que categorías + MSI suman el efectivo real del mes sin duplicar nada.
 export function useMonthlyActuals(mes: string) {
   const [state, setState] = useState<{ mes: string; actuals: Record<string, number> | undefined }>(() => ({
     mes,

@@ -1,6 +1,6 @@
 ---
 modulo: "Cuentas"
-status: en progreso
+status: cerrado
 ---
 ## Resumen del módulo
 
@@ -1104,9 +1104,11 @@ provisional `transactions`:
 | 2026-07-26 | CU-006 pasa de `historial_ajustes` embebido con `motivo` manual a generar automáticamente una transacción con concepto fijo "Ajuste manual" — se introduce la colección provisional `transactions` (RN-020); CU-003 muestra el historial de movimientos en vez del historial de ajustes; `color` amplía a paleta de 16 + editor hexadecimal, se almacena siempre como hex (RN-021); se retira `VALIDATION_007` (motivo, ya no aplica) | CU-001, CU-003, CU-004, CU-006 | Se actualiza [[data-model-registry]]: nueva colección `transactions`, primer diagrama ER generado |
 | 2026-08-06 | Se construye el módulo Cuentas en código (React + Supabase), completo (CU-001 a CU-006), sobre el modelo traducido a Postgres/RLS — ver [[data-model-registry]] para el detalle del esquema real. Se traduce a inglés el texto literal de los mensajes de error (`VALIDATION_001` a `008`, `BIZ_001` a `004`, `AUTH_001`/`SYS_001` reutilizados) y los nombres de la paleta de 16 colores de referencia, siguiendo la convención de idioma establecida en [[auth]] — los códigos, RN y el resto de la prosa de este documento no cambian. Decisión de implementación no documentada antes: la unicidad del nombre por usuario (RN-001/RN-005) se aplica sin distinguir mayúsculas/minúsculas. | CU-001, CU-002, CU-003, CU-004, CU-005, CU-006 | Se actualiza [[data-model-registry]]: `accounts` y `transactions` traducidas de Mongo a Postgres (tipos, constraints, RLS, RPC de ajuste atómico, bucket de Storage). |
 
+| 2026-09-04 | Cambio cruzado desde [[msi]]: el detalle de una cuenta de tipo `credito` incorpora dos tarjetas nuevas (CU-073), que no aplican a débito ni efectivo. La primera es un **calendario de pagos** de los doce meses del año, con navegación por año acotada a los años con datos (mismo criterio que RN-232/RN-240 de [[dashboard]]), que descompone el pago de cada mes en compras corrientes y parcialidades de planes — las compras a meses no se cuentan por su monto completo en el mes de la compra, entran repartidas (RN-278). La segunda lista los **planes con su amortización**: avance acumulado por plan y, al desplegarlo, cada parcialidad marcada como cargada, pendiente o absorbida por una liquidación. El avance se deriva del calendario y no de los pagos capturados (RN-279): el banco carga la parcialidad al corte, se haya liquidado el estado de cuenta o no. Desde ahí se administran los planes (alta, edición, baja y liquidación anticipada). El saldo de la tarjeta no cambia de definición: una compra a meses lo incrementa por su monto completo el día del registro (RN-272), que es lo que se le debe al banco, y de ahí sigue dependiendo el crédito disponible (RN-234). | CU-003 | Se actualiza [[data-model-registry]]: campos de MSI en `transactions`; numeración acuñada en [[msi]] |
 ## Referencias
 
 - [[estrategia]]
 - [[brief-ux]]
 - [[data-model-registry]]
 - [[backlog]]
+- [[msi]]

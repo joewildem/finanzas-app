@@ -31,6 +31,10 @@ export const TRANSACTION_ERROR_MESSAGES = {
   VALIDATION_035: DEBT_ERROR_MESSAGES.VALIDATION_035,
   BIZ_031: DEBT_ERROR_MESSAGES.BIZ_031,
   BIZ_033: DEBT_ERROR_MESSAGES.BIZ_033,
+  // Meses Sin Intereses (MSI, sin PRD todavía — ver supabase/migrations/20260903100000_*) —
+  // create_transaction/update_transaction devuelven estos códigos al capturar/editar el plan.
+  VALIDATION_038: 'The number of months must be between 2 and 60.',
+  BIZ_034: "Installment plans can only be set on an expense charged to a credit card.",
 } as const
 
 export type TransactionErrorCode = keyof typeof TRANSACTION_ERROR_MESSAGES

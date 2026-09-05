@@ -1,6 +1,6 @@
 ---
 modulo: "Reportes"
-status: en progreso
+status: histórico (sucedido por [[dashboard]])
 ---
 
 # Requerimientos — Reportes

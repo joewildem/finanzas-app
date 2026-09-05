@@ -1,6 +1,7 @@
 import type { IconSvgElement } from '@hugeicons/react'
 import {
   BanknoteArrowUpIcon,
+  Calendar03Icon,
   CardExchange01Icon,
   MoneyBag01Icon,
   PiggyBankIcon,
@@ -17,6 +18,7 @@ export type TransactionType =
   | 'aportacion_meta'
   | 'retiro_meta'
   | 'pago_deuda'
+  | 'compra_msi'
 
 export interface Transaction {
   id: string
@@ -29,6 +31,8 @@ export interface Transaction {
   deuda_id: string | null
   monto_capital: number | null
   monto_interes: number | null
+  msi_meses: number | null
+  msi_mes_inicio: string | null
   concepto: string
   monto: number
   nota: string | null
@@ -49,6 +53,7 @@ export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
   aportacion_meta: 'Goal contribution',
   retiro_meta: 'Goal withdrawal',
   pago_deuda: 'Debt payment',
+  compra_msi: 'Installment purchase',
 }
 
 export const TRANSACTION_TYPE_ICONS: Partial<Record<TransactionType, IconSvgElement>> = {
@@ -58,4 +63,5 @@ export const TRANSACTION_TYPE_ICONS: Partial<Record<TransactionType, IconSvgElem
   aportacion_meta: PiggyBankIcon,
   retiro_meta: MoneyBag01Icon,
   pago_deuda: BanknoteArrowUpIcon,
+  compra_msi: Calendar03Icon,
 }

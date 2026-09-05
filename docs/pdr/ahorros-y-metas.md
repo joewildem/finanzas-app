@@ -1,6 +1,6 @@
 ---
 modulo: "Ahorros y Metas"
-status: en progreso
+status: cerrado
 ---
 ---
 

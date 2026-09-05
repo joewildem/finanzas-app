@@ -1,6 +1,6 @@
 ---
 modulo: "Transacciones"
-status: en progreso
+status: cerrado
 ---
 ## Resumen del módulo
 
@@ -1257,6 +1257,7 @@ crean índices nuevos.
 
 - Pantalla / flujo: [[wireframe-transacciones-listado]] (modo selección, barra de acciones en lote)
 
+| 2026-09-04 | Cambio cruzado desde [[msi]]: `transactions.tipo` gana el valor `compra_msi`, una compra a meses sin intereses sobre una tarjeta de crédito. Es el primer tipo cuyo `category_id` es **forzosamente nulo por diseño y no por no aplicar**: esa nulidad es lo que mantiene estas compras fuera de las diez agregaciones de gasto del sistema (todas filtran por `tipo in (gasto, ingreso)`) sin que cada una deba excluirlas explícitamente — el diseño previo, un `gasto` con metadata `msi_meses` encima, sí lo exigía y se descartó por eso. Trae tres campos propios (`msi_meses`, `msi_mes_inicio`, `msi_liquidado_mes`) y su alta va por RPC dedicado (`create_msi_purchase`), no por `create_transaction`, que vuelve a su firma previa. **RN-039** (catálogo de categorías permitido por tipo) no aplica a este tipo. **CU-017** lo excluye de la edición desde el listado: el plazo y el mes de inicio no caben en el modal general, y editarlo ahí lo dejaría sin esos campos — se corrige desde el detalle de la tarjeta (CU-074). **CU-018** lo admite sin cambios: eliminarlo revierte el cargo sobre la tarjeta como cualquier otro movimiento, y arrastra en cascada los pagos capturados de sus parcialidades. | CU-013, CU-017, CU-018 | Se actualiza [[data-model-registry]]: enum `tipo` con `compra_msi`, tres campos nuevos, índice parcial `(account_id, msi_mes_inicio)`; numeración acuñada en [[msi]] |
 ## Referencias
 
 - [[estrategia]]
@@ -1267,3 +1268,4 @@ crean índices nuevos.
 - [[ahorros-y-metas]]
 - [[creditos-deudas]]
 - [[backlog]]
+- [[msi]]

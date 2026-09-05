@@ -310,6 +310,10 @@ export function TransactionsPage() {
             <div className="flex flex-col divide-y divide-border">
               {(transactions ?? []).map((transaction) => {
                 const isAdjustment = transaction.tipo === 'ajuste'
+                // Una compra a meses se edita desde el detalle de la tarjeta, no desde aquí: su
+                // plazo y mes de inicio no caben en el modal general, y editarla ahí la dejaría sin
+                // esos campos. Sí se puede eliminar, que revierte el saldo como cualquier otra.
+                const isMsiPurchase = transaction.tipo === 'compra_msi'
                 const isExpenseOrIncome = transaction.tipo === 'gasto' || transaction.tipo === 'ingreso'
                 const icon = isExpenseOrIncome
                   ? getCategoryIcon(transaction.category?.icono)
@@ -350,14 +354,16 @@ export function TransactionsPage() {
                       </p>
                       {!isAdjustment && !selectionMode && (
                         <>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label="Edit transaction"
-                            onClick={() => openEdit(transaction)}
-                          >
-                            <HugeiconsIcon icon={PencilEdit01Icon} className="size-4" />
-                          </Button>
+                          {!isMsiPurchase && (
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label="Edit transaction"
+                              onClick={() => openEdit(transaction)}
+                            >
+                              <HugeiconsIcon icon={PencilEdit01Icon} className="size-4" />
+                            </Button>
+                          )}
                           <DeleteTransactionDialog
                             transactionId={transaction.id}
                             isLinked={transaction.transaccion_relacionada_id !== null}

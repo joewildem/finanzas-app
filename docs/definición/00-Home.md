@@ -1,6 +1,6 @@
 ---
 status: en progreso
-last-updated: 2026-07-30
+last-updated: 2026-09-04
 ---
 
 # 🏦 Finanzas App — Home
@@ -12,15 +12,18 @@ Vault de documentación del proyecto. Empieza siempre aquí.
 - [x] Discovery & Definición
 - [x] Estrategia
 - [x] Brief UX inicial
-- [x] Requerimientos — Cuentas
-- [x] Requerimientos — Categorías
-- [x] Requerimientos — Transacciones
-- [ ] Requerimientos — Presupuesto *(en curso)*
-- [ ] Requerimientos — Reportes
-- [ ] User Flows
-- [ ] Wireframes
-- [ ] Hi-Fi (Figma)
-- [ ] Desarrollo del MVP
+- [x] Requerimientos — los 10 módulos del alcance
+- [x] Construcción en código — alcance completo
+- [ ] QA integral
+- [ ] Lanzamiento
+
+El proyecto ya no lanza un MVP reducido para iterar después: se construye el alcance completo (salvo
+lo que vive en [[backlog]]) antes de lanzar. Detalle en [[estrategia]]. Suscripciones queda fuera de
+forma permanente — se resuelve con una app externa.
+
+Los user flows y wireframes previos a la construcción quedaron sin hacerse: los módulos se
+construyeron directamente en código, revisando sobre la pantalla ya funcionando. Se conservan las
+plantillas por si un módulo futuro las amerita.
 
 Roadmap completo → [[roadmap]]
 
@@ -30,28 +33,30 @@ Roadmap completo → [[roadmap]]
 
 ## 🎯 Estrategia
 
-- [[estrategia]] — visión, diferenciadores, alcance del MVP
+- [[estrategia]] — visión, diferenciadores, alcance
 
 ## 🎨 Diseño UX/UI
 
 - [[brief-ux]] — arquitectura de información, flujos clave, inventario de pantallas
-- User flows por módulo → carpeta `design/user-flows/`
-- Wireframes por módulo → carpeta `design/wireframes/`
 
 ## 📋 Requerimientos (PRD detallado, por módulo)
 
-- [[cuentas]]
-- [[categorias]]
-- [[transacciones]]
-- [[presupuesto]]
-- [[reportes]]
-
-> [[presupuesto]] y [[reportes]] no existen todavía — los links aparecen en rojo hasta que
-> cerremos esas fases. Es normal, y de hecho es útil: Obsidian te muestra de un vistazo qué falta.
+- [[auth]] — acceso cerrado por lista blanca, OAuth de Google
+- [[cuentas]] — débito, efectivo y tarjetas de crédito
+- [[categorias]] — grupos y categorías, con flujo estructural
+- [[transacciones]] — el registro central de movimientos
+- [[presupuesto]] — presupuesto mensual estilo YNAB
+- [[ahorros-y-metas]] — metas de ahorro
+- [[inversiones]] — instrumentos y balance capturado
+- [[creditos-deudas]] — deuda externa (auto, hipoteca, personal)
+- [[msi]] — compras a meses sin intereses
+- [[dashboard]] — Balance, Networth y Analytics
+- [[reportes]] — **registro histórico**: sucedido por [[dashboard]], nunca se construyó en su forma
+  original. Sus CU y RN no se reutilizan.
 
 ## 🗺️ Roadmap
 
-- [[roadmap]] — plan de 6 meses, semana a semana
+- [[roadmap]] — semanas 1-13 como registro histórico; de ahí en adelante sin fechas comprometidas
 
 ## 🗄️ Backlog de futuro
 

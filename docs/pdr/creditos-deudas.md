@@ -1,6 +1,6 @@
 ---
 modulo: "Créditos y Deudas"
-status: en progreso
+status: cerrado
 ---
 
 # Requerimientos — Créditos y Deudas

@@ -18,12 +18,14 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 
 |Contador|Último usado|Módulo de origen|
 |---|---|---|
-|Casos de uso (CU-XXX)|CU-071|dashboard|
-|Reglas de negocio (RN-XXX)|RN-269|dashboard|
-|Errores de validación (VALIDATION_XXX)|VALIDATION_037|dashboard|
+|Casos de uso (CU-XXX)|CU-077|msi|
+|Reglas de negocio (RN-XXX)|RN-289|msi|
+|Errores de validación (VALIDATION_XXX)|VALIDATION_039|msi|
 |Errores de autenticación/autorización (AUTH_XXX)|AUTH_003|auth|
-|Errores de lógica de negocio (BIZ_XXX)|BIZ_033|creditos-deudas|
+|Errores de lógica de negocio (BIZ_XXX)|BIZ_035|msi|
 |Errores de sistema (SYS_XXX)|SYS_001|cuentas|
+
+> Nota (2026-09-04): [[msi]] se construyó primero en código y se documentó después, a diferencia del resto del repositorio. Su numeración (CU-072 a CU-077, RN-270 a RN-289, `VALIDATION_038`/`VALIDATION_039`, `BIZ_034`/`BIZ_035`) se asignó al cerrar el documento, tomando los códigos que ya estaban en uso en las migraciones. La columna `budgets.msi_transaction_id`, introducida por la primera versión del módulo y retirada por la definitiva, no dejó números reservados.
 
 > Nota: el módulo `auth` no generó códigos nuevos de `VALIDATION_XXX` ni `BIZ_XXX` — el ingreso se resuelve enteramente con OAuth de Google y códigos `AUTH_XXX`, sin formularios propios que validar ni reglas de lógica de negocio del tipo "recurso no encontrado / conflicto".
 
@@ -130,13 +132,16 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |---|---|---|---|---|
 |`user_id`|uuid (FK → users.id)|Sí|—|CU-006|
 |`account_id`|uuid (FK → accounts.id)|Sí|—|CU-006|
-|`tipo`|text (enum: `ajuste`, `gasto`, `ingreso`, `transferencia`, `pago_tarjeta`, `aportacion_meta`, `retiro_meta`, `pago_deuda`)|Sí|—|CU-006 (`ajuste`); CU-013 (`gasto`, `ingreso`); CU-014 (`transferencia`); CU-015 (`pago_tarjeta`); CU-040 de [[ahorros-y-metas]] (`aportacion_meta`, flujo de captura habilitado); CU-041 de [[ahorros-y-metas]] (`retiro_meta`, nuevo); CU-060 de [[creditos-deudas]] (`pago_deuda`, nuevo)|
-|`category_id`|uuid\|null (FK → categories.id)|Sí, solo si `tipo=gasto\|ingreso`|`null`|CU-013 (RN-039, RN-041); editable en CU-017 (RN-053); `null` para `ajuste`, `transferencia`, `pago_tarjeta`, `aportacion_meta`, `retiro_meta`, `pago_deuda`|
+|`tipo`|text (enum: `ajuste`, `gasto`, `ingreso`, `transferencia`, `pago_tarjeta`, `aportacion_meta`, `retiro_meta`, `pago_deuda`, `compra_msi`)|Sí|—|CU-006 (`ajuste`); CU-013 (`gasto`, `ingreso`); CU-014 (`transferencia`); CU-015 (`pago_tarjeta`); CU-040 de [[ahorros-y-metas]] (`aportacion_meta`, flujo de captura habilitado); CU-041 de [[ahorros-y-metas]] (`retiro_meta`, nuevo); CU-060 de [[creditos-deudas]] (`pago_deuda`, nuevo); CU-072 de [[msi]] (`compra_msi`, nuevo)|
+|`category_id`|uuid\|null (FK → categories.id)|Sí, solo si `tipo=gasto\|ingreso`|`null`|CU-013 (RN-039, RN-041); editable en CU-017 (RN-053); `null` para `ajuste`, `transferencia`, `pago_tarjeta`, `aportacion_meta`, `retiro_meta`, `pago_deuda` y `compra_msi` — en este último la nulidad es estructural y deliberada (RN-270 de [[msi]]): es lo que mantiene esas compras fuera de todo reporte de gasto por categoría sin depender de que cada consulta las excluya|
 |`transaccion_relacionada_id`|uuid\|null (FK → transactions.id, self)|Sí, solo si `tipo=transferencia\|pago_tarjeta`|`null`|CU-014, CU-015 (RN-045, RN-050); enlaza las dos filas de un mismo movimiento entre cuentas; **no aplica a `aportacion_meta`/`retiro_meta`/`pago_deuda`** (corregido en [[ahorros-y-metas]] — ver `meta_id`/`deuda_id`)|
 |`meta_id`|uuid\|null (FK → savings_goals.id)|Sí, solo si `tipo=aportacion_meta\|retiro_meta`|`null`|CU-040, CU-041 de [[ahorros-y-metas]] (RN-125, RN-131); mutuamente excluyente con `category_id` y `deuda_id`; no genera una segunda fila — la misma fila se consulta por `account_id` (historial de la cuenta) o por `meta_id` (historial de la meta)|
 |`deuda_id`|uuid\|null (FK → debts.id)|Sí, solo si `tipo=pago_deuda`|`null`|CU-060 de [[creditos-deudas]] (RN-213); mutuamente excluyente con `category_id` y `meta_id`; misma fila consultada por `account_id` o por `deuda_id` según el historial|
 |`monto_capital`|numeric(14,2)\|null|Sí, solo si `tipo=pago_deuda`|`null`|CU-060 de [[creditos-deudas]] (RN-215); reduce el saldo calculado de la deuda (RN-216); junto con `monto_interes` suma el valor absoluto de `monto`|
 |`monto_interes`|numeric(14,2)\|null|Sí, solo si `tipo=pago_deuda`|`null`|CU-060 de [[creditos-deudas]] (RN-215); no reduce el saldo de la deuda — es el costo del financiamiento (RN-216)|
+|`msi_meses`|smallint\|null|Sí, solo si `tipo=compra_msi`|`null`|CU-072 de [[msi]] (RN-273); número de parcialidades, entre 2 y 60|
+|`msi_mes_inicio`|text\|null (`YYYY-MM`)|Sí, solo si `tipo=compra_msi`|`null`|CU-072 de [[msi]] (RN-274); mes de la primera parcialidad, que no se deriva de `fecha`: comprar después de la fecha de corte de la tarjeta empuja el plan al mes siguiente|
+|`msi_liquidado_mes`|text\|null (`YYYY-MM`)|No|`null`|CU-076 de [[msi]] (RN-282); mes en que el plan se liquidó por adelantado — ese mes concentra las parcialidades pendientes y los posteriores quedan en cero|
 |`concepto`|text|Sí|—|CU-006 (fijo: "Ajuste manual" para `tipo=ajuste`); autogenerado ("Aportación a meta: {nombre}" / "Retiro de meta: {nombre}" / "Pago a deuda: {nombre}") para `aportacion_meta`/`retiro_meta`/`pago_deuda` (RN-130, RN-136 de [[ahorros-y-metas]]; RN-220 de [[creditos-deudas]])|
 |`monto`|numeric(14,2)|Sí|—|CU-006; con signo desde CU-013 (RN-038): negativo = salida, positivo = entrada; editable en CU-017 (RN-052)|
 |`nota`|text\|null|No|`null`|CU-013 a CU-015; editable en CU-017; máx. 140 caracteres|
@@ -159,6 +164,7 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |`(transaccion_relacionada_id)` `WHERE transaccion_relacionada_id IS NOT NULL`|Único parcial|Localizar la fila enlazada de un movimiento entre dos cuentas|CU-014; reutilizado en CU-015, CU-017, CU-018|
 |`(meta_id, fecha desc)` `WHERE meta_id IS NOT NULL`|Parcial|Listar movimientos de una meta en orden cronológico descendente|CU-040 de [[ahorros-y-metas]]; reutilizado en CU-037, CU-041|
 |`(deuda_id, fecha desc)` `WHERE deuda_id IS NOT NULL`|Parcial|Listar pagos de una deuda en orden cronológico descendente|CU-060 de [[creditos-deudas]]; reutilizado en CU-057|
+|`(account_id, msi_mes_inicio)` `WHERE tipo = compra_msi`|Parcial|Listar los planes a meses de una tarjeta|CU-072 de [[msi]]; reutilizado en CU-073|
 
 ### `categories`
 
@@ -417,6 +423,42 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 
 `user_id` ya es primary key — no requiere índice adicional.
 
+### `msi_payments`
+
+> Tabla nueva, introducida por [[msi]]. Guarda cuánto pagó el usuario de la parcialidad de un plan en
+> un mes dado. Es el único dato de MSI que el sistema no puede derivar: un abono a una tarjeta es un
+> monto único que no indica qué parte corresponde a qué plan, de modo que la asignación es
+> necesariamente manual (RN-285).
+>
+> No se guardó en `budgets` —donde la llave (usuario, concepto, mes) ya existía— porque ahí `monto`
+> significa "lo que planeo asignar" y alimenta el cálculo de dinero por repartir. Un pago ya ocurrido
+> no es una asignación, y colocarlo ahí habría dejado una fila cuyo monto el presupuesto tendría que
+> ignorar.
+
+```json
+{
+  "id": "uuid"
+}
+```
+
+|Campo|Tipo|Requerido|Default|Procedencia (CU)|
+|---|---|---|---|---|
+|`user_id`|uuid (FK → users.id)|Sí|—|CU-077|
+|`msi_transaction_id`|uuid (FK → transactions.id, `on delete cascade`)|Sí|—|CU-077; la cascada es deliberada: sin el plan, sus pagos carecen de significado (RN-281)|
+|`mes`|text (`YYYY-MM`)|Sí|—|CU-077|
+|`monto`|numeric(14,2)|Sí|—|CU-077 (RN-285); mayor o igual a cero; vaciar el campo elimina la fila|
+|`created_at`|timestamptz|Sí|`now()`|CU-077|
+|`updated_at`|timestamptz|Sí|`now()`|CU-077|
+
+> Política RLS: `auth.uid() = user_id`, con las cuatro operaciones (incluye `delete`, a diferencia de
+> `savings_goals` y `debts`, que solo admiten baja lógica).
+
+**Índices**
+
+|Campos|Tipo|Propósito|Procedencia (CU)|
+|---|---|---|---|
+|`(user_id, msi_transaction_id, mes)`|Único|Un pago por plan y mes|CU-077|
+
 ## Relaciones
 
 |Relación|Patrón (embebido / referenciado)|Cardinalidad|Justificación|Procedencia (CU)|
@@ -424,6 +466,8 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |`accounts.user_id` → `users`|Referenciado (FK)|1:N (un usuario, varias cuentas)|Se consultan por separado con frecuencia; evita duplicar datos de usuario en cada cuenta|CU-001; formalizado en CU-032|
 |`transactions.account_id` → `accounts`|Referenciado (FK)|1:N (una cuenta, varios movimientos)|Se consulta con frecuencia filtrando por cuenta para mostrar el historial (CU-003)|CU-006|
 |`transactions.user_id` → `users`|Referenciado (FK)|1:N|Igual que `accounts.user_id`|CU-006; formalizado en CU-032|
+|`msi_payments.msi_transaction_id` → `transactions`|Referenciado (FK, cascada)|1:N (un plan, un pago por mes)|El plan es la compra misma (`tipo=compra_msi`), no una entidad aparte; sus pagos se borran con ella|CU-077 de [[msi]]|
+|`msi_payments.user_id` → `users`|Referenciado (FK)|1:N|Igual que el resto de las tablas del dominio|CU-077 de [[msi]]|
 |`categories.user_id` → `users`|Referenciado (FK)|1:N|Igual que `accounts.user_id`|CU-007; formalizado en CU-032|
 |`categories.grupo_id` → `categories` (self)|Referenciado (FK)|1:N (un grupo, varias categorías)|Una sola tabla modela grupo y categoría, distinguidos explícitamente por `tipo`; deja la puerta abierta a que Créditos e Inversión la reutilicen sin rediseño|CU-007, CU-008|
 |`transactions.category_id` → `categories`|Referenciado (FK)|1:N (una categoría, varios movimientos)|Un gasto o ingreso pertenece a una categoría; se consulta con frecuencia para reportes por categoría|CU-013|
@@ -474,6 +518,8 @@ erDiagram
     INVESTMENTS ||--o{ INVESTMENT_BALANCE_HISTORY : "registra balance capturado"
     DEBTS ||--o{ TRANSACTIONS : "recibe pagos"
     DEBTS ||--o{ BUDGETS : "presupuesta"
+    USERS ||--o{ MSI_PAYMENTS : "posee"
+    TRANSACTIONS ||--o{ MSI_PAYMENTS : "recibe pagos de parcialidad"
     USERS {
         uuid id
         text correo
@@ -565,6 +611,12 @@ erDiagram
         uuid user_id
         numeric monto_objetivo
     }
+    MSI_PAYMENTS {
+        uuid id
+        uuid msi_transaction_id
+        text mes
+        numeric monto
+    }
 ```
 
 _(se agrega la entidad `USERS` tras el cierre de [[auth]], resolviendo las cuatro relaciones que quedaban pendientes desde el primer módulo. Se agrega la entidad `SAVINGS_GOALS` tras el cierre de [[ahorros-y-metas]]; `BUDGETS.categoria_reservada` fue reemplazado por `BUDGETS.meta_id` en el mismo cierre. Desde el 2026-08-22, todo el diagrama usa tipos Postgres nativos — ya no hay mezcla de notación Mongo/Postgres. Se agregan las entidades `INVESTMENTS` e `INVESTMENT_BALANCE_HISTORY` tras el cierre de [[inversiones]]: nótese que **`INVESTMENTS` solo se relaciona con `USERS` y con su propio histórico** — no toca `CATEGORIES`, `TRANSACTIONS` ni `BUDGETS`, por decisión explícita documentada en la sección de Relaciones. Se agrega la entidad `DEBTS` tras el cierre de [[creditos-deudas]], la última fase de Casos de uso y Requerimientos del alcance completo: a diferencia de `INVESTMENTS`, `DEBTS` sí se relaciona con `TRANSACTIONS` (vía `deuda_id`, mismo patrón de documento único que `SAVINGS_GOALS`) y con `BUDGETS` (vía `deuda_id`, un renglón presupuestable por deuda activa). Se agrega la entidad `NETWORTH_GOALS` tras documentarse la pestaña Networth de [[dashboard]]: única tabla del registro con relación `1:1` hacia `USERS` (`user_id` es su propia primary key, sin `id` propio) — no se relaciona con ninguna otra entidad.)_
@@ -593,7 +645,9 @@ _(ninguno por ahora. Si un módulo nuevo contradice una definición previa de un
 |2026-08-26|dashboard|Se documenta la pestaña Networth del módulo Dashboard — territorio nuevo, no sucede a ningún CU de [[reportes]]. Se agregan CU-065 a CU-068: resumen de Cash & Savings, Investments y Liabilities agrupados por tipo (metas activas + cuentas débito/efectivo; inversiones activas por `tipo_activo`; tarjetas de crédito + deudas activas por `tipo`); evolución histórica del Networth total con selector de periodo (1M/6M/YTD/1Y/All/Custom), siempre con granularidad mensual, generalizando a cuatro fuentes (cuentas, metas, inversiones, deudas) la reconstrucción "a la fecha" ya usada en Balance (RN-230) — las inversiones usan el snapshot más reciente de `investment_balance_history` anterior o igual a cada punto; comparativo Assets vs Liabilities (snapshot actual, sin historial); y meta de Networth configurable con gauge de avance (tope visual en 100%, porcentaje real sin tope en texto). **Se introduce la primera tabla nueva del módulo Dashboard**, `networth_goals` (un registro por usuario, `user_id` como primary key, sin historial de metas anteriores) — el resto sigue siendo 100% agregación en tiempo de consulta, sin más colecciones ni campos nuevos. Se resuelve explícitamente la ambigüedad de nomenclatura entre "Assets" (concepto amplio: Cash & Savings + Investments, exclusivo del comparativo) y la card "Cash & Savings" (subconjunto): se documenta como nota al inicio de la sección Networth en [[dashboard]]. Se agrega `VALIDATION_036` (rango de fechas inválido en el periodo Custom) y `VALIDATION_037` (meta de Networth ≤ 0). Se actualiza el índice de numeración hasta CU-068 / RN-256 / VALIDATION_037 / BIZ_033 (sin cambio) / AUTH_003 (sin cambio) / SYS_001 (sin cambio), la tabla de Relaciones y el diagrama ER (`NETWORTH_GOALS`, relación 1:1 con `USERS`). Analytics queda pendiente de documentar y construir — es la última pestaña del Dashboard.|
 |2026-08-28|categorias|Cambio cruzado, disparado al alinear la pestaña Analytics de [[dashboard]]: `categories.flujo` (enum `category_flow`) gana un tercer valor, `investment`, junto a `inflow`/`outflow` (RN-118 revisada en [[categorias]]). Reemplaza la última comparación por nombre exacto ("Investment") que quedaba en el sistema: el chip homónimo del formulario de alta de transacciones ahora filtra por `flujo = investment` en vez de por nombre (RN-039 de [[transacciones]], revisada), y `create_transaction`/`update_transaction` aceptan `tipo = gasto` contra grupos `outflow` **o** `investment` (antes solo `outflow`). Budget gana una tercera tabla, "Investment", paralela a Inflow/Outflow (RN-075 de [[presupuesto]], revisada) — decisión explícita del usuario, en vez de dejar el grupo Investment visualmente dentro de Outflow. Backfill: el grupo semilla "Investment" de cuentas existentes pasa de `outflow` a `investment`; `seed_default_categories_for_user` siembra el grupo nuevo ya como `investment`. Aprovechando esta revisión, se documentan en este registro los campos `flujo`/`orden` de `categories` (RN-118/RN-119), ausentes desde su introducción el 2026-08-11 — un vacío de documentación, no un cambio de esquema. No se agregan CU, RN, ni códigos de error nuevos — es una extensión de un enum ya existente. `supabase/migrations/20260828100000_add_category_flow_investment.sql` (solo `alter type ... add value` — Postgres exige que se confirme antes de usarse en la misma sesión, error `55P04` reproducido y corregido al aplicarla) + `supabase/migrations/20260828100001_backfill_category_flow_investment.sql` (backfill, siembra, RPCs). |CU-007, CU-010, CU-013, CU-014, CU-017, CU-019, CU-022|Se actualiza el esquema de `categories` en este registro (enum `category_flow`, campos `flujo`/`orden` documentados por primera vez) y el diagrama ER (`CATEGORIES.flujo`/`orden`); índice de numeración sin cambio.|
 |2026-08-28|dashboard|Se documenta la pestaña Analytics del módulo Dashboard — la última del alcance completo, cierra la fase de construcción en código de todo el producto. Se agregan CU-069 a CU-071: cuatro cards de resumen (Income, Expenses, Savings, Investment) con comparativo contra un periodo anterior equivalente (mismo o menor tamaño, sin comparación en "All"); gráfica de Cash Flow (Income vs Expenses, granularidad siempre mensual, mismo criterio que Networth); y una card de barras horizontales por cada grupo de categorías del usuario (Inflow, Outflow e Investment por igual), mostrando la distribución interna por categoría. Suceden funcionalmente a CU-027/CU-028/CU-030 de [[reportes]] — CU-031 (frecuencia de transacciones) no se retoma, queda en [[backlog]]. No se crean colecciones nuevas — 100% agregación en tiempo de consulta sobre `transactions`, `categories` y `savings_goals`, reutilizando el vocabulario de periodo (`1m`/`6m`/`ytd`/`1y`/`all`/`custom`) ya introducido por Networth (CU-066), generalizado en un helper compartido. Se actualiza el índice de numeración hasta CU-071 / RN-269 (VALIDATION_037, BIZ_033, AUTH_003, SYS_001 sin cambio).|CU-069, CU-070, CU-071|Con este cierre, [[reportes]] queda enteramente resuelto entre Balance, Networth y Analytics; se actualiza la nota de sucesión correspondiente en el índice de numeración.|
+|2026-09-04|msi|Se documenta el módulo Meses Sin Intereses, construido primero en código y documentado después. Se agregan CU-072 a CU-077 (registrar, consultar, editar, eliminar y liquidar un plan; capturar el pago de una parcialidad) y RN-270 a RN-289. `transactions.tipo` gana el valor `compra_msi`, con tres campos propios (`msi_meses`, `msi_mes_inicio`, `msi_liquidado_mes`) y `category_id` forzosamente nulo: esa nulidad es estructural (RN-270) y es lo que mantiene estas compras fuera de las diez agregaciones de gasto del sistema sin que cada una deba excluirlas. Se agrega la tabla `msi_payments` (pago capturado a mano por plan y mes, RN-285) — no se reutilizó `budgets` porque ahí `monto` significa "lo que planeo asignar" y alimenta el dinero por repartir. [[presupuesto]] gana el grupo "Installments (MSI)", único cuyos renglones invierten el significado de asignado/real (RN-286): la mensualidad es derivada y fija, el pago es capturado y editable. RN-075 resta además el total de mensualidades del mes (RN-287). [[cuentas]] gana en el detalle de tarjeta el calendario de pagos y la amortización por plan (CU-073). Analytics queda explícitamente fuera del alcance (RN-289). Se agregan `VALIDATION_038` (plazo fuera de rango), `VALIDATION_039` (mes de liquidación fuera del plan), `BIZ_034` (la cuenta no es una tarjeta de crédito propia y activa) y `BIZ_035` (plan inexistente o ajeno). Se actualiza el índice hasta CU-077 / RN-289 / VALIDATION_039 / BIZ_035, la tabla de Relaciones y el diagrama ER (`MSI_PAYMENTS`).|CU-072 a CU-077|[[transacciones]] (tipo nuevo, CU-017 lo excluye de la edición desde el listado), [[presupuesto]] (grupo nuevo, RN-075 revisada), [[cuentas]] (detalle de tarjeta)|
+|2026-09-04|msi|Registro del diseño descartado, por su valor como precedente: la primera versión (migraciones `20260903100000` y `20260903110000`, aplicadas en producción) modelaba una compra a meses como un `gasto` con `msi_meses` encima —es decir, con categoría— y agregaba `budgets.msi_transaction_id` como cuarta opción excluyente. Se sustituyó al constatar que obligaba a excluir esas compras en cada agregación de gasto (diez hooks) y que bastaba olvidarlo en una para tener dos pantallas contradiciéndose. La migración `20260904130000_msi_module.sql` retira esa columna, devuelve `budgets` a su constraint de tres vías y restaura `save_budgets`/`copy_budget_month` a su versión previa. `budgets` queda exactamente como antes de MSI.|CU-072|[[presupuesto]] (sin cambios netos en el esquema de `budgets`)|
 
 ---
 
-Documentos relacionados: [[estrategia]] · [[brief-ux]] · [[roadmap]] · [[backlog]] · [[auth]] · [[ahorros-y-metas]] · [[inversiones]] · [[creditos-deudas]] · [[dashboard]]
+Documentos relacionados: [[estrategia]] · [[brief-ux]] · [[roadmap]] · [[backlog]] · [[auth]] · [[ahorros-y-metas]] · [[inversiones]] · [[creditos-deudas]] · [[dashboard]] · [[msi]]

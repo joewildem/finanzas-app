@@ -1,6 +1,6 @@
 ---
 modulo: "Autenticación"
-status: borrador
+status: cerrado
 ---
 
 # Requerimientos — Autenticación

@@ -1,6 +1,6 @@
 import { Fragment } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { ChevronRightIcon } from '@hugeicons/core-free-icons'
+import { CardExchange01Icon, ChevronRightIcon } from '@hugeicons/core-free-icons'
 
 import { AvailableChip } from '@/components/budget/available-chip'
 import { CurrencyInput } from '@/components/accounts/currency-input'
@@ -9,12 +9,14 @@ import { formatCurrency } from '@/lib/accounts'
 import type { Category, CategoryGroup } from '@/lib/categories'
 import { getCategoryIcon } from '@/lib/category-icons'
 import { DEBT_TYPE_ICONS, type Debt } from '@/lib/debts'
+import type { MsiPlan } from '@/lib/msi'
 import type { SavingsGoal } from '@/lib/savings-goals'
 import { cn } from '@/lib/utils'
 
 const CELL_PADDING = 'py-3'
 const GOALS_GROUP_ID = 'goals'
 const DEBTS_GROUP_ID = 'debts'
+const MSI_GROUP_ID = 'msi'
 
 function sumFor(categories: Category[], values: Record<string, number | undefined>): number {
   return categories.reduce((sum, category) => sum + (values[category.id] ?? 0), 0)
@@ -45,6 +47,9 @@ export function BudgetTable({
   onChangeAmount,
   goals,
   debts,
+  msiPlans,
+  msiPaid,
+  onChangeMsiPaid,
   emptyMessage,
 }: {
   title: string
@@ -64,17 +69,30 @@ export function BudgetTable({
   // con "real" mensual = capital + interés pagado en el mes (a diferencia del saldo de la deuda,
   // que solo cuenta capital).
   debts?: Debt[]
+  // MSI — el renglón de un plan funciona al revés que los demás, a propósito: "Assigned" es la
+  // mensualidad que impone el banco (un dato, no una decisión: va como texto fijo) y "Current" es lo
+  // que se pagó, que es justo lo único que la aplicación no puede derivar — un abono a la tarjeta es
+  // un monto único que no dice a qué plan corresponde. Por eso aquí el editable es el segundo.
+  msiPlans?: { plan: MsiPlan; monthIndex: number; installment: number }[]
+  msiPaid?: Record<string, number | undefined>
+  onChangeMsiPaid?: (planId: string, value: number | undefined) => void
   emptyMessage?: string
 }) {
   const hasGoals = (goals?.length ?? 0) > 0
   const hasDebts = (debts?.length ?? 0) > 0
-  const isEmpty = groups.length === 0 && !hasGoals && !hasDebts
+  const hasMsi = (msiPlans?.length ?? 0) > 0
+  const isEmpty = groups.length === 0 && !hasGoals && !hasDebts && !hasMsi
   const goalsOpen = openGroups[GOALS_GROUP_ID] ?? true
   const goalsAssigned = hasGoals ? goals!.reduce((sum, goal) => sum + (amounts[goal.id] ?? 0), 0) : 0
   const goalsCurrent = hasGoals ? goals!.reduce((sum, goal) => sum + (actuals[goal.id] ?? 0), 0) : 0
   const debtsOpen = openGroups[DEBTS_GROUP_ID] ?? true
   const debtsAssigned = hasDebts ? debts!.reduce((sum, debt) => sum + (amounts[debt.id] ?? 0), 0) : 0
   const debtsCurrent = hasDebts ? debts!.reduce((sum, debt) => sum + (actuals[debt.id] ?? 0), 0) : 0
+  const msiOpen = openGroups[MSI_GROUP_ID] ?? true
+  const msiAssigned = hasMsi ? msiPlans!.reduce((sum, entry) => sum + entry.installment, 0) : 0
+  const msiCurrent = hasMsi
+    ? msiPlans!.reduce((sum, { plan }) => sum + (msiPaid?.[plan.id] ?? 0), 0)
+    : 0
 
   return (
     <div className="flex flex-col gap-2">
@@ -300,6 +318,81 @@ export function BudgetTable({
                         <AvailableChip
                           assigned={amounts[debt.id] ?? 0}
                           current={actuals[debt.id] ?? 0}
+                          isIncome={isIncome}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </Fragment>
+            )}
+
+            {hasMsi && (
+              <Fragment>
+                <TableRow
+                  className={cn('cursor-pointer select-none', shadeGroupRows && 'bg-muted/40 hover:bg-muted/60')}
+                  onClick={() => onToggleGroup(MSI_GROUP_ID)}
+                >
+                  <TableCell className={CELL_PADDING}>
+                    <div className="flex items-center gap-2">
+                      <HugeiconsIcon
+                        icon={ChevronRightIcon}
+                        className={cn('size-4 shrink-0 text-muted-foreground transition-transform', msiOpen && 'rotate-90')}
+                      />
+                      <span className="font-medium text-foreground">Installments (MSI)</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className={cn(CELL_PADDING, GROUP_ROW_AMOUNT_CLASS, 'text-foreground')}>
+                    {formatCurrency(msiAssigned)}
+                  </TableCell>
+                  <TableCell className={cn(CELL_PADDING, GROUP_ROW_AMOUNT_CLASS, 'text-foreground')}>
+                    {formatCurrency(msiCurrent)}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      CELL_PADDING,
+                      GROUP_ROW_AMOUNT_CLASS,
+                      availableColorClass(msiAssigned, msiCurrent, isIncome),
+                    )}
+                  >
+                    {formatCurrency(msiAssigned - msiCurrent)}
+                  </TableCell>
+                </TableRow>
+
+                {msiOpen &&
+                  msiPlans!.map(({ plan, monthIndex, installment }) => (
+                    <TableRow key={plan.id}>
+                      <TableCell className={CELL_PADDING}>
+                        <div className="flex items-center gap-2 pl-6">
+                          <HugeiconsIcon
+                            icon={CardExchange01Icon}
+                            className="size-4 shrink-0 text-muted-foreground"
+                            strokeWidth={2}
+                          />
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate text-card-foreground">{plan.concepto}</span>
+                            <span className="truncate text-xs text-muted-foreground">
+                              Month {monthIndex} of {plan.meses} · {plan.accountNombre}
+                            </span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      {/* Fijo: la mensualidad la fija el banco. El `pr-2` empareja su borde derecho
+                          con el de los montos editables, que llevan padding propio en su recuadro. */}
+                      <TableCell className={cn(CELL_PADDING, AMOUNT_COL_WIDTH, 'pr-2 text-right font-mono text-foreground')}>
+                        {formatCurrency(installment)}
+                      </TableCell>
+                      <TableCell className={cn(CELL_PADDING, AMOUNT_COL_WIDTH)}>
+                        <CurrencyInput
+                          value={msiPaid?.[plan.id] ?? 0}
+                          onChange={(value) => onChangeMsiPaid?.(plan.id, value)}
+                          allowEmpty
+                          variant="flat"
+                        />
+                      </TableCell>
+                      <TableCell className={cn(CELL_PADDING, 'text-right')}>
+                        <AvailableChip
+                          assigned={installment}
+                          current={msiPaid?.[plan.id] ?? 0}
                           isIncome={isIncome}
                         />
                       </TableCell>

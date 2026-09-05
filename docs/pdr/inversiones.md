@@ -1,6 +1,6 @@
 ---
 modulo: "Inversiones"
-status: en progreso
+status: cerrado
 ---
 
 # Requerimientos — Inversiones

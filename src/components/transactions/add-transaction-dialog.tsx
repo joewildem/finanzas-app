@@ -250,6 +250,7 @@ export function AddTransactionDialog({
     const showsGoal = chip === 'goal_contribution' || chip === 'goal_withdrawal'
     const showsDebt = chip === 'debt_payment'
 
+
     if (isEditMode && editingTransaction) {
       if (showsCategory && !categoryId) {
         setSubmitError('VALIDATION_001')
@@ -562,6 +563,7 @@ export function AddTransactionDialog({
                   />
                 </>
               )}
+
 
               <DatePickerRow value={fecha} onChange={setFecha} />
 

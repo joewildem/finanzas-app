@@ -6,6 +6,7 @@ export interface Budget {
   category_id: string | null
   meta_id: string | null
   deuda_id: string | null
+  msi_transaction_id: string | null
   mes: string
   monto: number
   created_at: string

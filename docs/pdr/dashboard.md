@@ -1,6 +1,6 @@
 ---
 modulo: "Dashboard"
-status: en progreso
+status: cerrado
 ---
 
 # Requerimientos — Dashboard

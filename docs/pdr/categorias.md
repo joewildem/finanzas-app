@@ -1,6 +1,6 @@
 ---
 modulo: "Categorías"
-status: en progreso
+status: cerrado
 ---
 ## Resumen del módulo
 

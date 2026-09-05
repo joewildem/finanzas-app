@@ -1,3 +1,5 @@
+import type { TransactionType } from '@/lib/transactions'
+
 export type AccountType = 'debito' | 'credito' | 'efectivo'
 export type AccountStatus = 'active' | 'archived'
 
@@ -20,14 +22,18 @@ export interface Account {
   updated_at: string
 }
 
+// El historial de una cuenta trae todos sus movimientos, no solo los ajustes — `tipo` estaba
+// declarado como `'ajuste'` desde que solo se usaba para pintar concepto/monto/fecha, y quedaba
+// mintiendo sobre lo que la consulta realmente devuelve (`select('*')`, ver use-account.ts).
 export interface AccountTransaction {
   id: string
   user_id: string
   account_id: string
-  tipo: 'ajuste'
+  tipo: TransactionType
   concepto: string
   monto: number
   fecha: string
+  msi_meses: number | null
   created_at: string
 }
 

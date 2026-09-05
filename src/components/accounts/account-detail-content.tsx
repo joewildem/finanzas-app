@@ -8,8 +8,10 @@ import { ArchiveAccountDialog } from '@/components/accounts/archive-account-dial
 import { EmptyState } from '@/components/empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { CreditCardMsiSection } from '@/components/accounts/credit-card-msi-section'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAccount } from '@/hooks/use-account'
+import { useMsiPlans } from '@/hooks/use-msi-plans'
 import { ACCOUNT_TYPE_LABELS, computeAvailableCredit, formatCurrency } from '@/lib/accounts'
 import { supabase } from '@/lib/supabase'
 
@@ -19,6 +21,7 @@ import { supabase } from '@/lib/supabase'
 // solo aporta su propio "chrome" alrededor de este componente.
 export function AccountDetailContent({ accountId }: { accountId: string | undefined }) {
   const { account, movements, refetch } = useAccount(accountId)
+  const { plans: msiPlans, refetch: refetchMsiPlans } = useMsiPlans()
   const [editOpen, setEditOpen] = useState(false)
 
   if (account === undefined) {
@@ -39,6 +42,10 @@ export function AccountDetailContent({ accountId }: { accountId: string | undefi
     account.tipo === 'credito' && account.linea_credito != null
       ? computeAvailableCredit(account.linea_credito, account.saldo_actual)
       : null
+
+  // MSI (sin PRD todavía, ver supabase/migrations/20260903100000_*) — planes de esta tarjeta,
+  // recientes primero (useMsiPlans ya ordena por fecha desc), con su estatus a la fecha de hoy.
+  const accountMsiPlans = (msiPlans ?? []).filter((plan) => plan.accountId === account.id)
 
   return (
     <div className="flex flex-col gap-6">
@@ -127,6 +134,18 @@ export function AccountDetailContent({ accountId }: { accountId: string | undefi
           </CardContent>
         </Card>
       </div>
+
+      {account.tipo === 'credito' && (
+        <CreditCardMsiSection
+          accountId={account.id}
+          plans={accountMsiPlans}
+          movements={movements}
+          onChanged={() => {
+            refetch()
+            refetchMsiPlans()
+          }}
+        />
+      )}
 
       <Card>
         <CardHeader>
