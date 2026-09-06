@@ -164,15 +164,13 @@ export function SubscriptionsPage() {
     } else if (sortBy === 'name') {
       rows.sort((a, b) => a.subscription.nombre.localeCompare(b.subscription.nombre))
     } else {
-      // Por fecha de cobro: primero lo que sigue pendiente, y lo ya pagado al final — una vez
-      // saldada, la suscripción deja de reclamar atención.
+      // Por el **primer** cobro del mes, no por el siguiente pendiente. Es deliberado: ordenar por
+      // el pendiente hace que marcar una casilla mueva la card de lugar, y en una semanal con cuatro
+      // cargos la card salta en cada clic. El orden tiene que ser estable frente a lo que el usuario
+      // marca; lo que cambia al marcar es el aspecto de la card, no su posición.
       rows.sort((a, b) => {
-        const fa = a.status.next
-        const fb = b.status.next
-        if (fa && fb) return fa.getTime() - fb.getTime()
-        if (fa) return -1
-        if (fb) return 1
-        return a.subscription.nombre.localeCompare(b.subscription.nombre)
+        const diff = a.status.charges[0].getTime() - b.status.charges[0].getTime()
+        return diff !== 0 ? diff : a.subscription.nombre.localeCompare(b.subscription.nombre)
       })
     }
     return rows

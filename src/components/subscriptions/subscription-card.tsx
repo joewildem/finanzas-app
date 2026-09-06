@@ -130,18 +130,23 @@ export function SubscriptionCard({
           </div>
         </div>
 
+        {/* Marcar pagado no mueve la card: cambia su aspecto y nada más. La casilla queda marcada y
+            la fecha tachada, que es la señal habitual de "esto ya está hecho". */}
         <label className="flex cursor-pointer items-center gap-2 border-t border-border pt-3">
           <Checkbox checked={allPaid} onCheckedChange={handleToggle} aria-label="Mark as paid" />
-          <span className={cn('text-xs', allPaid ? 'text-success' : 'text-muted-foreground')}>
-            {allPaid ? (
-              'Paid'
-            ) : (
-              <>
-                {dueLabel ? `${dueLabel} · ` : ''}
-                {next ? formatDate(next) : '—'}
-              </>
-            )}
-          </span>
+          {allPaid ? (
+            <span className="flex items-center gap-1.5 text-xs">
+              <span className="text-success">Paid</span>
+              <span className="text-muted-foreground line-through">
+                {formatDate(charges[charges.length - 1])}
+              </span>
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              {dueLabel ? `${dueLabel} · ` : ''}
+              {next ? formatDate(next) : '—'}
+            </span>
+          )}
           {charges.length > 1 && (
             <span className="ml-auto shrink-0 text-xs text-muted-foreground">
               {paidCount}/{charges.length}
