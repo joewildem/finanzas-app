@@ -18,8 +18,8 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 
 |Contador|Último usado|Módulo de origen|
 |---|---|---|
-|Casos de uso (CU-XXX)|CU-082|suscripciones|
-|Reglas de negocio (RN-XXX)|RN-320|suscripciones|
+|Casos de uso (CU-XXX)|CU-083|suscripciones|
+|Reglas de negocio (RN-XXX)|RN-327|suscripciones|
 |Errores de validación (VALIDATION_XXX)|VALIDATION_041|suscripciones|
 |Errores de autenticación/autorización (AUTH_XXX)|AUTH_003|auth|
 |Errores de lógica de negocio (BIZ_XXX)|BIZ_036|suscripciones|
@@ -511,6 +511,42 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |`(user_id, nombre) where status = 'active'`|Único parcial|Nombre único entre activas; una archivada libera su nombre|CU-078 (RN-294)|
 |`(user_id, status)`|Índice|Listado por estatus|CU-079|
 
+### `subscription_payments`
+
+> Tabla nueva, introducida por CU-083 de [[suscripciones]]. Registra que un cobro concreto ya se
+> pagó. Es el único dato del módulo que no se deriva: todo lo demás sale de `fecha_inicio` y
+> `ciclo` (RN-321).
+>
+> La llave es **la fecha del cobro**, no el mes: una suscripción semanal tiene cuatro cargos en un
+> mes y "pagada en septiembre" no diría cuál (RN-322). La presencia de la fila es el estado —existe
+> igual a pagado—, así que no hay booleano y desmarcar es borrar; mismo criterio que `msi_payments`
+> con un monto nulo. No se guarda el monto: es el de la suscripción al momento de consultar
+> (RN-327).
+
+```json
+{
+  "id": "uuid"
+}
+```
+
+|Campo|Tipo|Requerido|Default|Procedencia (CU)|
+|---|---|---|---|---|
+|`user_id`|uuid (FK → users.id, `on delete cascade`)|Sí|—|CU-083|
+|`subscription_id`|uuid (FK → subscriptions.id, `on delete cascade`)|Sí|—|CU-083; la cascada es deliberada: sin la suscripción, sus pagos carecen de significado|
+|`fecha`|date|Sí|—|CU-083 (RN-322); la fecha del cobro marcado|
+|`created_at`|timestamptz|Sí|`now()`|CU-083|
+|`updated_at`|timestamptz|Sí|`now()`|CU-083|
+
+> Política RLS: `auth.uid() = user_id` en `select`, `insert` y `delete`. **Sí tiene `delete`**, a
+> diferencia de `subscriptions`: desmarcar un pago es borrar la fila.
+
+**Índices**
+
+|Campos|Tipo|Propósito|Procedencia (CU)|
+|---|---|---|---|
+|`(user_id, subscription_id, fecha)`|Único|Un cobro no se puede marcar dos veces|CU-083 (RN-322)|
+|`(user_id, fecha)`|Índice|Lectura de los pagos de un mes|CU-083|
+
 ## Relaciones
 
 |Relación|Patrón (embebido / referenciado)|Cardinalidad|Justificación|Procedencia (CU)|
@@ -520,6 +556,8 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |`transactions.user_id` → `users`|Referenciado (FK)|1:N|Igual que `accounts.user_id`|CU-006; formalizado en CU-032|
 |`msi_payments.msi_transaction_id` → `transactions`|Referenciado (FK, cascada)|1:N (un plan, un pago por mes)|El plan es la compra misma (`tipo=compra_msi`), no una entidad aparte; sus pagos se borran con ella|CU-077 de [[msi]]|
 |`msi_payments.user_id` → `users`|Referenciado (FK)|1:N|Igual que el resto de las tablas del dominio|CU-077 de [[msi]]|
+|`subscription_payments.subscription_id` → `subscriptions`|Referenciado (FK, cascada)|1:N (una suscripción, un pago por fecha de cobro)|Marcar un cobro como pagado es el único dato no derivado del módulo; sus filas se van con la suscripción|CU-083 de [[suscripciones]]|
+|`subscription_payments.user_id` → `users`|Referenciado (FK, cascada)|1:N|Igual que el resto de las tablas del dominio|CU-083 de [[suscripciones]]|
 |`subscriptions.user_id` → `users`|Referenciado (FK, cascada)|1:N|**Su única relación.** El módulo no toca `transactions`, `budgets`, `accounts` ni `categories`: un cobro de suscripción no genera transacción ni consume presupuesto (RN-311). `metodo_pago` guarda el nombre de una cuenta como texto, no su `id` (RN-300)|CU-078 de [[suscripciones]]|
 |`categories.user_id` → `users`|Referenciado (FK)|1:N|Igual que `accounts.user_id`|CU-007; formalizado en CU-032|
 |`categories.grupo_id` → `categories` (self)|Referenciado (FK)|1:N (un grupo, varias categorías)|Una sola tabla modela grupo y categoría, distinguidos explícitamente por `tipo`; deja la puerta abierta a que Créditos e Inversión la reutilicen sin rediseño|CU-007, CU-008|
@@ -573,6 +611,8 @@ erDiagram
     DEBTS ||--o{ BUDGETS : "presupuesta"
     USERS ||--o{ MSI_PAYMENTS : "posee"
     USERS ||--o{ SUBSCRIPTIONS : "posee"
+    USERS ||--o{ SUBSCRIPTION_PAYMENTS : "posee"
+    SUBSCRIPTIONS ||--o{ SUBSCRIPTION_PAYMENTS : "tiene cobros marcados como pagados"
     TRANSACTIONS ||--o{ MSI_PAYMENTS : "recibe pagos de parcialidad"
     USERS {
         uuid id
@@ -686,6 +726,12 @@ erDiagram
         text status
         date archivada_en
     }
+    SUBSCRIPTION_PAYMENTS {
+        uuid id
+        uuid user_id
+        uuid subscription_id
+        date fecha
+    }
 ```
 
 _(se agrega la entidad `USERS` tras el cierre de [[auth]], resolviendo las cuatro relaciones que quedaban pendientes desde el primer módulo. Se agrega la entidad `SAVINGS_GOALS` tras el cierre de [[ahorros-y-metas]]; `BUDGETS.categoria_reservada` fue reemplazado por `BUDGETS.meta_id` en el mismo cierre. Desde el 2026-08-22, todo el diagrama usa tipos Postgres nativos — ya no hay mezcla de notación Mongo/Postgres. Se agregan las entidades `INVESTMENTS` e `INVESTMENT_BALANCE_HISTORY` tras el cierre de [[inversiones]]: nótese que **`INVESTMENTS` solo se relaciona con `USERS` y con su propio histórico** — no toca `CATEGORIES`, `TRANSACTIONS` ni `BUDGETS`, por decisión explícita documentada en la sección de Relaciones. Se agrega la entidad `DEBTS` tras el cierre de [[creditos-deudas]], la última fase de Casos de uso y Requerimientos del alcance completo: a diferencia de `INVESTMENTS`, `DEBTS` sí se relaciona con `TRANSACTIONS` (vía `deuda_id`, mismo patrón de documento único que `SAVINGS_GOALS`) y con `BUDGETS` (vía `deuda_id`, un renglón presupuestable por deuda activa). Se agrega la entidad `NETWORTH_GOALS` tras documentarse la pestaña Networth de [[dashboard]]: única tabla del registro con relación `1:1` hacia `USERS` (`user_id` es su propia primary key, sin `id` propio) — no se relaciona con ninguna otra entidad. Se agrega la entidad `SUBSCRIPTIONS` tras el cierre de [[suscripciones]]: es el caso más extremo de aislamiento del registro — **su única arista es hacia `USERS`**, más aislada aún que `INVESTMENTS`, que al menos tiene su propio histórico. No comparte `CATEGORIES` (usa un catálogo propio) y su método de pago es texto, no una arista hacia `ACCOUNTS`.)_
@@ -718,6 +764,7 @@ _(ninguno por ahora. Si un módulo nuevo contradice una definición previa de un
 |2026-09-04|msi|Registro del diseño descartado, por su valor como precedente: la primera versión (migraciones `20260903100000` y `20260903110000`, aplicadas en producción) modelaba una compra a meses como un `gasto` con `msi_meses` encima —es decir, con categoría— y agregaba `budgets.msi_transaction_id` como cuarta opción excluyente. Se sustituyó al constatar que obligaba a excluir esas compras en cada agregación de gasto (diez hooks) y que bastaba olvidarlo en una para tener dos pantallas contradiciéndose. La migración `20260904130000_msi_module.sql` retira esa columna, devuelve `budgets` a su constraint de tres vías y restaura `save_budgets`/`copy_budget_month` a su versión previa. `budgets` queda exactamente como antes de MSI.|CU-072|[[presupuesto]] (sin cambios netos en el esquema de `budgets`)|
 |2026-09-05|ahorros-y-metas, creditos-deudas|Ajustes sobre módulos ya construidos, **sin cambios de esquema** — ninguna colección, índice o relación se modifica. Se agregan RN-290 a RN-293. Las cards de meta y de deuda pasan a mostrar su fecha (`fecha_limite` / `fecha_liquidacion_estimada`) como pill en el renglón de cierre en lugar del tiempo restante, con altura mínima fija en ese renglón (RN-290, RN-293): la pill en un renglón propio desigualaba la altura de las cards dentro de una fila del grid. El detalle de una meta con fecha límite gana el bloque de ritmo de ahorro (RN-291, RN-292): `monto_restante` entre los días que faltan, y ese diario por 7 y por 30 — calculado en tiempo de consulta, sin persistir nada, y sin relación con transacciones ni [[presupuesto]]. Se revisa RN-129 de [[ahorros-y-metas]] en consecuencia.|CU-043, CU-044, CU-056|[[ahorros-y-metas]] (RN-290 a RN-292, RN-129 revisada), [[creditos-deudas]] (RN-293)|
 |2026-09-05|suscripciones|Se crea el módulo Suscripciones, construido primero en código y documentado después (segundo caso tras [[msi]]) y primero que **no** formaba parte del alcance: revierte la decisión de dejarlo fuera para siempre, registrada en `CLAUDE.md` hasta el 2026-09-04. Se agrega la tabla `subscriptions` y con ella CU-078 a CU-082 y RN-294 a RN-320. Es la tabla más aislada del registro: **ninguna llave foránea fuera de `users`**, catálogo de categorías propio en vez de `categories` (RN-295) y método de pago como texto en vez de una FK a `accounts` (RN-300) — un cobro de suscripción no genera transacción, no consume presupuesto y no aparece en Analytics (RN-311). Es también el primer módulo **sin funciones RPC**: no hay saldo que mover, así que insert/update directos bajo RLS bastan. Las fechas de cobro no se almacenan: se derivan de `fecha_inicio` y `ciclo` en el cliente, anclando cada ocurrencia al inicio para que el recorte de fin de mes no se arrastre (RN-302, RN-303). Archivar sella `archivada_en` y corta las ocurrencias ahí, conservando el pasado (RN-312) — sin esa fecha, archivar habría borrado retroactivamente gasto real de las gráficas. Se agregan `VALIDATION_040` (nombre duplicado), `VALIDATION_041` (fecha de fin anterior al inicio) y `BIZ_036` (suscripción inexistente o ajena). Se actualiza el índice hasta CU-082 / RN-320 / VALIDATION_041 / BIZ_036, la tabla de Relaciones y el diagrama ER (`SUBSCRIPTIONS`).|CU-078 a CU-082|Ninguno — el módulo no modifica ninguna tabla ni documento existente|
+|2026-09-06|suscripciones|Se agrega la tabla `subscription_payments` (CU-083, RN-321 a RN-327): marcar un cobro como pagado, el primer dato del módulo que no se deriva de `fecha_inicio` y `ciclo`. La llave es la **fecha del cobro** y no el mes, porque un ciclo semanal tiene cuatro cargos mensuales y el mes no distingue cuál; la presencia de la fila es el estado, sin booleano, y desmarcar es borrar — de ahí que sea la primera tabla del módulo con política de `delete`. El estado de pago no altera ningún total de gasto (RN-326): alimenta únicamente la card "Left to pay" (RN-324). Se revisan RN-307 y RN-308 de [[suscripciones]]: desaparece el bloque "Next 30 days" —y con él la única excepción al navegador único de mes— y el listado principal pasa a mostrar solo lo que cobra en el mes visible, con el inventario completo movido a un panel lateral (RN-325). Se actualiza el índice hasta CU-083 / RN-327, la tabla de Relaciones y el diagrama ER (`SUBSCRIPTION_PAYMENTS`).|CU-079, CU-083|Ninguno — el módulo sigue sin tocar ninguna tabla de otro módulo|
 
 ---
 

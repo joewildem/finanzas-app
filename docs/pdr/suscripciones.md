@@ -1,7 +1,7 @@
 ---
 modulo: "Suscripciones"
 status: cerrado
-last-updated: 2026-09-05
+last-updated: 2026-09-06
 ---
 
 # Requerimientos — Suscripciones
@@ -114,8 +114,8 @@ calendario de cobros; no se captura fecha de cobro alguna.
   suscripción no queda atada a la cuenta: renombrar una cuenta después no actualiza las
   suscripciones. Es el precio explícito de la independencia entre módulos (RN-311).
 - RN-301: la marca de prueba gratuita no altera ningún cálculo. Solo destaca la suscripción en la
-  card y en la lista de próximos cobros, porque no ver a tiempo el fin de una prueba es el caso donde
-  no mirar cuesta dinero.
+  card y en el panel lateral, porque no ver a tiempo el fin de una prueba es el caso donde no mirar
+  cuesta dinero.
 
 **Casos de uso derivados identificados**
 
@@ -262,11 +262,13 @@ del mismo mes se documenta aparte en CU-082.
 - RN-306: la card de cada suscripción muestra el monto de cobro con el sufijo de su ciclo
   (`/mo`, `/yr`, …) y, al lado, el costo anualizado. Un pago único no lleva ninguno de los dos.
 - RN-307: un **único navegador de mes** gobierna las cards, el listado, ambas gráficas y el
-  calendario. La única excepción es la lista de próximos cobros, que cuenta desde la fecha actual y
-  no desde el mes visible, porque la pregunta que responde solo tiene sentido en presente.
-- RN-308: el listado y el conteo de suscripciones muestran las que estaban **vigentes en el mes
-  visible** —las que ya habían iniciado y cuyo corte aún no llegaba— y no las vigentes hoy. Navegar a
-  enero muestra lo que se pagaba en enero.
+  calendario, sin excepciones. La fecha actual solo se usa para dos cosas que no son periodos:
+  resaltar el día de hoy en el calendario y expresar la proximidad de un cobro ("In 9 days").
+- RN-308: el listado muestra únicamente las suscripciones con **al menos un cobro en el mes
+  visible**. Una anual aparece solo en su mes de cobro, no los otros once. El conteo de la card
+  "Active" sigue un criterio distinto y más amplio —las **vigentes** ese mes, tengan cobro o no—
+  porque responde "¿cuántas tengo contratadas?" y no "¿qué me cobran ahora?". El inventario completo,
+  incluidas las que no cobran en el mes y las archivadas, vive en el panel lateral (RN-325).
 - RN-309: el desglose por categoría corresponde al mes visible y se ordena de mayor a menor. Solo
   aparecen las categorías con al menos un cobro ese mes.
 - RN-310: la gráfica de evolución muestra **los doce meses del año**, incluidos los que no tienen
@@ -282,6 +284,14 @@ del mismo mes se documenta aparte en CU-082.
   API exigen enlazar y no cachear. Brandfetch responde `200` con un marcador genérico para un dominio
   que no conoce en lugar de un `404`, de modo que el paso al siguiente respaldo se decide por el
   tamaño de la imagen recibida: sirve 40×40 donde un logo real viene en 400×400.
+
+- RN-324: la card "Left to pay" muestra la suma de los cobros del mes que **aún no se han marcado
+  como pagados** (CU-083). Con todo saldado marca cero y se pinta en el color de éxito. Es la única
+  de las cuatro cards que depende de un dato capturado y no derivado.
+- RN-325: el botón "View all" abre un panel lateral con **todas** las suscripciones —las que no
+  cobran en el mes visible y las archivadas incluidas—, cada una con su logo, nombre, categoría,
+  ciclo, monto y fecha del próximo cobro. Es la vista de inventario; la pantalla principal es la del
+  mes.
 
 **Requerimientos técnicos backend**
 
@@ -467,6 +477,76 @@ pasar el cursor— qué suscripciones son.
 
 ---
 
+### CU-083 — Marcar un cobro como pagado
+
+**Actor:** Usuario autenticado (dueño de los datos)
+
+**Descripción del caso de uso**
+
+Permite señalar que un cobro concreto ya se pagó, para saber cuánto falta por cubrir en el mes. Es
+seguimiento puro: no genera transacción, no afecta el saldo de ninguna cuenta y no altera los totales
+de gasto, que siguen contando el cobro completo se haya pagado o no.
+
+**Flujo principal**
+
+1. En la card de una suscripción del mes, el usuario marca la casilla.
+2. El sistema registra el cobro pendiente más próximo como pagado.
+3. La card avanza al siguiente cobro pendiente del mes, o pasa al estado "Paid" si ya no queda
+   ninguno; la card "Left to pay" se reduce en el monto correspondiente.
+4. Desmarcar revierte el último cobro dado por pagado.
+
+**Flujos alternativos / casos borde**
+
+- En una suscripción con varios cobros en el mes (semanal, diaria), la card indica el avance
+  (`2/4`) y la casilla solo se ve marcada cuando no queda ninguno pendiente (RN-323).
+- Marcar dos veces el mismo cobro es imposible: lo impide una restricción única.
+
+**Postcondiciones**
+
+- Existe —o deja de existir— una fila en `subscription_payments`. Ninguna otra tabla cambia.
+
+**Reglas de negocio**
+
+- RN-321: marcar un cobro como pagado es el **primer dato del módulo que no se deriva**. Todo lo
+  demás sale de `fecha_inicio` y `ciclo`; esto solo lo sabe el usuario, y por eso necesita
+  almacenamiento propio.
+- RN-322: un cobro se identifica por la suscripción y **su fecha**, no por el mes. Una semanal tiene
+  cuatro cargos en un mes, y "pagada en septiembre" no diría cuál. La presencia de la fila es el
+  estado —existe igual a pagado—: no hay booleano que pueda quedar en falso, y desmarcar es borrar,
+  mismo criterio que `msi_payments` con un monto nulo.
+- RN-323: la casilla avanza **cobro por cobro**, no mes por mes: marca el pendiente más próximo, no
+  todos los del mes. Marcarlos todos al primer clic daría por pagado algo que aún no ocurre.
+  Desmarcar revierte el último dado por pagado, que es el que se acaba de marcar por error.
+- RN-326: el estado de pago **no altera ningún total de gasto**. "Charged in {mes}" cuenta el cobro
+  completo esté pagado o no; lo que cambia es "Left to pay". Un cobro existe porque el calendario
+  dice que ocurre, no porque el usuario lo haya confirmado.
+- RN-327: no se guarda el monto del pago. Es el de la suscripción en el momento de consultar, de modo
+  que corregir el precio también corrige los pagos ya marcados — coherente con el resto del módulo,
+  donde nada del pasado está congelado.
+
+**Requerimientos técnicos backend**
+
+| Método | Endpoint | Auth |
+|---|---|---|
+| POST | `/api/v1/subscription-payments` | Bearer JWT |
+| DELETE | `/api/v1/subscription-payments?subscription_id=…&fecha=…` | Bearer JWT |
+
+Tabla `subscription_payments`, detallada en [[data-model-registry]]. A diferencia de
+`subscriptions`, sí tiene política de `delete`: desmarcar es borrar la fila.
+
+**Matriz de pruebas**
+
+| # | Categoría | Escenario | Input | Resultado esperado | HTTP |
+|---|---|---|---|---|---|
+| 1 | Flujo exitoso | Marcar un cobro | Mensual del mes visible | Fila creada, "Left to pay" baja | 201 |
+| 2 | Flujo exitoso | Desmarcar | Cobro ya marcado | Fila borrada, "Left to pay" sube | 204 |
+| 3 | Validación de entrada | Marcar dos veces el mismo cobro | Misma suscripción y fecha | Rechazado por el índice único | 409 |
+| 4 | Caso borde | Suscripción con cuatro cobros al mes | Semanal | La casilla se marca al cuarto; antes muestra el avance | 201 |
+| 5 | Flujo exitoso | Los totales no cambian | Cobro marcado | "Charged in {mes}" idéntico; solo cambia "Left to pay" | 200 |
+| 6 | Autenticación / autorización | Token expirado o ausente | Sin JWT válido | `AUTH_001` | 401 |
+
+---
+
 ## Cambios en otros documentos
 
 ### [[data-model-registry]]
@@ -485,6 +565,7 @@ Es la particularidad del módulo: no modifica [[transacciones]], [[presupuesto]]
 |Fecha|Cambio|CU afectado|Impacto en otros documentos|
 |---|---|---|---|
 |2026-09-05|Se crea el módulo Suscripciones, construido primero en código y documentado después (segundo caso, tras [[msi]]). Tabla `subscriptions` propia, sin llaves foráneas fuera de `users`: un cobro de suscripción no genera transacción, no consume presupuesto y no aparece en Analytics (RN-311). Se agregan CU-078 a CU-082 y RN-294 a RN-320. Es el primer módulo **sin funciones RPC**: no hay saldo que mover, así que insert/update directos bajo RLS bastan, y lo único derivado —qué días cae cada cobro— se calcula en el cliente (RN-302). Decisiones de fondo acordadas antes de construir: los totales son cargos reales del periodo y no un costo normalizado (RN-304), con el promedio mensual como dato secundario (RN-305); un solo navegador de mes gobierna toda la pantalla (RN-307); archivar sella la fecha del corte y conserva el pasado (RN-312); se descartan los ciclos *seasonal* y *fortnightly* y se agregan `quarterly` y `semiannual` (RN-296). El logo se deriva del sitio web vía Brandfetch, enlazado y no almacenado (RN-316), lo que elimina el campo de avatar que el diseño original contemplaba. Este documento **revierte** la decisión registrada en `CLAUDE.md` de dejar Suscripciones fuera del alcance para siempre.|CU-078 a CU-082|Se actualiza [[data-model-registry]] con la colección `subscriptions`, el diagrama ER y el índice de numeración. Ningún otro documento cambia — el módulo no toca ninguna tabla existente.|
+|2026-09-06|Ajustes sobre la pantalla, tras la primera prueba de uso. Se agrega CU-083 (marcar un cobro como pagado) con la tabla `subscription_payments` y RN-321 a RN-327: es el primer dato del módulo que no se deriva, y se identifica por fecha de cobro y no por mes para que los ciclos con varios cargos al mes no queden ambiguos. Se agrega la card "Left to pay" (RN-324). El listado principal pasa a mostrar **solo las suscripciones con cobro en el mes visible** en lugar de todas las vigentes, de modo que una anual aparece únicamente en su mes (RN-308 revisada), y cada card gana la fecha del próximo cobro. El inventario completo se mueve a un panel lateral tras el botón "View all" (RN-325), construido sobre el mismo primitivo `Dialog` de Base UI que el resto de los diálogos. Desaparece el bloque "Next 30 days": lo que aportaba —cuándo toca el siguiente cobro— ahora vive en cada card, y con él desaparece la única excepción al navegador único de mes (RN-307 revisada). Cambios visuales: el logo se muestra plano, sin anillo ni sombra; la línea de "Month by month" toma el lime de marca; y las cifras de ambos tooltips llevan signo de moneda.|CU-079, CU-083|Se actualiza [[data-model-registry]] con `subscription_payments` y el índice hasta CU-083 / RN-327.|
 
 ## Referencias
 
