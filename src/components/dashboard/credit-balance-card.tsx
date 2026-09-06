@@ -44,17 +44,20 @@ export function CreditBalanceCard({ account, cycleSpend }: { account: Account; c
       />
 
       <div className="relative flex h-full flex-col p-4">
-        <div className="flex flex-1 flex-col justify-center gap-1.5">
+        {/* Anclado abajo y no centrado: el aire sobrante se acumula arriba, que es donde no estorba,
+            en vez de repartirse entre el nombre y el chip y dejar a los dos flotando. */}
+        <div className="flex flex-1 flex-col justify-end gap-1.5">
           <p className="truncate text-sm font-medium text-white/80">{account.nombre}</p>
           <p className="font-mono text-2xl font-medium text-white">{formatCurrency(account.saldo_actual)}</p>
         </div>
 
         {/* El hueco del chip se reserva siempre, tenga o no la tarjeta un mínimo configurado. Es la
             única forma de que dos cards lado a lado empiecen el nombre a la misma altura: dentro del
-            bloque centrado, el chip lo hacía más alto y empujaba el nombre hacia arriba solo en las
-            tarjetas que lo tienen. Aquí el espacio existe siempre y lo único que cambia es si está
-            ocupado. */}
-        <div className="flex h-6 shrink-0 items-center">
+            bloque de arriba, el chip lo hacía más alto y empujaba el nombre solo en las tarjetas que
+            lo tienen. Aquí el espacio existe siempre y lo único que cambia es si está ocupado.
+            La altura del hueco es mayor que la del chip a propósito, para que quede a media altura
+            entre el saldo y la barra en vez de pegado a una de las dos. */}
+        <div className="flex h-10 shrink-0 items-center">
           {showCycle && (
             <span className="truncate rounded-full bg-white/15 px-2 py-0.5 text-[10px] text-white/80">
               Cycle: {formatCurrency(cycleSpend!.gasto_ciclo_actual)} / {formatCurrency(gastoMinimo)}
