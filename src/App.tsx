@@ -17,6 +17,7 @@ import { LoginPage } from '@/pages/login-page'
 import { SavingsGoalDetailPage } from '@/pages/savings/savings-goal-detail-page'
 import { SavingsListPage } from '@/pages/savings/savings-list-page'
 import { SettingsLayout } from '@/pages/settings/settings-layout'
+import { SubscriptionsPage } from '@/pages/subscriptions/subscriptions-page'
 import { TransactionsPage } from '@/pages/transactions/transactions-page'
 
 function ProtectedLayout() {
@@ -39,6 +40,7 @@ function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/accounts/:accountId" element={<DashboardAccountDetailPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
+          <Route path="/subscriptions" element={<SubscriptionsPage />} />
           <Route path="/budget" element={<BudgetPage />} />
           <Route path="/savings">
             <Route index element={<SavingsListPage />} />

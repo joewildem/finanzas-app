@@ -6,6 +6,7 @@ import {
   MoreHorizontalIcon,
   PiggyBankIcon,
   ReceiptTextIcon,
+  RepeatIcon,
   Wallet01Icon,
 } from '@hugeicons/core-free-icons'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
@@ -23,6 +24,7 @@ const PRIMARY_ITEMS = [
 const MORE_ITEMS = [
   { label: 'Debts', path: '/debts', icon: CreditCardIcon },
   { label: 'Transactions', path: '/transactions', icon: ReceiptTextIcon },
+  { label: 'Subscriptions', path: '/subscriptions', icon: RepeatIcon },
 ] as const
 
 // Bottom tab bar visible en <=768px (`md:hidden`) — sustituye a la navegación del header, que en

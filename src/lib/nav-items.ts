@@ -5,4 +5,5 @@ export const NAV_ITEMS = [
   { label: 'Investments', path: '/investments' },
   { label: 'Debts', path: '/debts' },
   { label: 'Transactions', path: '/transactions' },
+  { label: 'Subscriptions', path: '/subscriptions' },
 ] as const
