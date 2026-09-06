@@ -223,19 +223,29 @@ export function computeContributionPlan(
   }
 }
 
-// Tolerancia de desvío respecto al porcentaje objetivo, en puntos porcentuales. Dentro de ella un
-// instrumento se considera en su sitio: una cartera nunca cuadra al decimal, y pintar de color cada
-// desviación mínima haría que el color dejara de significar algo.
-export const ALLOCATION_TOLERANCE_PP = 2
+// Tolerancia de desvío respecto al porcentaje objetivo, **en proporción al propio objetivo** y no en
+// puntos porcentuales. Dentro de ella un instrumento se considera en su sitio: una cartera nunca
+// cuadra al decimal, y pintar de color cada desviación mínima haría que el color dejara de
+// significar algo.
+//
+// Es proporcional porque un umbral fijo de puntos porcentuales se vuelve ciego justo donde el desvío
+// duele más: con dos puntos de tolerancia, un instrumento de objetivo 3% tendría que caer a 1% —
+// perder dos tercios de su posición— antes de pintarse, mientras que uno de objetivo 25% se pinta
+// por una desviación proporcionalmente ocho veces menor. Medido contra el objetivo, el umbral
+// significa lo mismo en toda la tabla.
+export const ALLOCATION_TOLERANCE_RATIO = 0.2
 
 export type AllocationDrift = 'under' | 'onTarget' | 'over'
 
 // Dónde está un instrumento respecto a su objetivo. Con objetivo de 10%, por debajo de 8% está
-// `under`, por encima de 12% está `over`, y en medio `onTarget`.
+// `under` y por encima de 12% está `over`; con objetivo de 3%, los mismos límites caen en 2.4% y
+// 3.6%.
 export function classifyAllocation(actual: number | undefined, objetivo: number): AllocationDrift {
-  if (actual === undefined) return 'onTarget'
-  const desvio = actual - objetivo
-  if (desvio <= -ALLOCATION_TOLERANCE_PP) return 'under'
-  if (desvio >= ALLOCATION_TOLERANCE_PP) return 'over'
+  // Sin objetivo no hay contra qué comparar. No ocurre en instrumentos activos —la base exige que su
+  // objetivo sea mayor que cero— pero sí protege a quien llame con un inactivo.
+  if (actual === undefined || objetivo <= 0) return 'onTarget'
+  const desvioRelativo = (actual - objetivo) / objetivo
+  if (desvioRelativo <= -ALLOCATION_TOLERANCE_RATIO) return 'under'
+  if (desvioRelativo >= ALLOCATION_TOLERANCE_RATIO) return 'over'
   return 'onTarget'
 }
