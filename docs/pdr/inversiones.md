@@ -300,6 +300,18 @@ de `investments` e `investment_balance_history`._
   valor positivo que lo rebasa. Se calcula sobre el total activo **actual**, sin considerar ninguna
   aportación pendiente — a diferencia del cálculo de CU-053, que proyecta sobre el total más la
   aportación.
+- RN-328: las columnas de diagnóstico llevan formato condicional con una tolerancia de **2 puntos
+  porcentuales** respecto al objetivo. Con objetivo de 10%: `porcentaje_actual` se muestra en rojo
+  hasta 8%, sin color entre 8% y 12%, y en verde a partir de 12%. La tolerancia existe porque una
+  cartera nunca cuadra al decimal, y pintar cada desviación mínima haría que el color dejara de
+  significar algo. El `porcentaje_nuevo` de la simulación (CU-053) usa el mismo umbral pero **un solo
+  color de advertencia** en vez de rojo y verde: ahí la pregunta es si la aportación acerca el
+  instrumento a su objetivo, y quedarse corto o pasarse son el mismo problema. `diferencia` muestra
+  el signo siempre, también en positivo, y la aportación sugerida en cero se atenúa para que solo
+  resalten las filas que sí reciben dinero.
+  La tolerancia se mide en puntos porcentuales y no en proporción, lo que hace que un instrumento de
+  objetivo pequeño casi nunca se pinte: con objetivo de 3%, el rojo exigiría bajar a 1%. Es una
+  consecuencia conocida del umbral elegido, no un descuido.
 - RN-163: los instrumentos inactivos no participan en ningún cálculo de porcentaje objetivo,
   porcentaje actual ni diferencia. Se presentan con `porcentaje_del_total` = `balance_actual ÷
   total_general`, dato informativo sin regla asociada.
@@ -1300,6 +1312,7 @@ numeración e historial de cambios.
 
 | Fecha | Cambio | CU afectado | Impacto en otros documentos |
 |---|---|---|---|
+| 2026-09-06 | Formato condicional en las columnas de diagnóstico del portafolio (RN-328), sin cambios de esquema ni de cálculo: los valores mostrados son los mismos, solo se colorean. Se introduce una tolerancia de 2 puntos porcentuales respecto al objetivo, compartida por `porcentaje_actual` (rojo por debajo, verde por encima) y por el `porcentaje_nuevo` de la simulación, que usa un único color de advertencia porque ahí la dirección del desvío es indiferente. `diferencia` pasa a mostrar el signo también en positivo y la aportación sugerida en cero se atenúa. | CU-050, CU-053 | Se actualiza [[data-model-registry]]: índice de numeración hasta RN-328 |
 | 2026-08-23 | Se crea el módulo Inversiones: tabla `investments` (ticker, nombre, grupo y tipo de activo como enums cerrados, porcentaje objetivo, balance actual capturado manualmente, estado activo/inactivo) y tabla `investment_balance_history` (una fila por instrumento y fecha, sin pantalla propia, como insumo del futuro Dashboard + Reportes). Se agregan CU-049 a CU-054. El módulo es un registro y planificador: no ejecuta ni registra movimientos de dinero, y `balance_actual` es un dato capturado, no derivado de `transactions` (RN-156). Se establece la regla del 100% sobre el conjunto activo (RN-172) con guardado atómico por lote (RN-175), y el algoritmo de distribución de la siguiente aportación en dos fases — cubrir faltantes y repartir el remanente por porcentaje objetivo (RN-186 a RN-191). | CU-049 a CU-054 | Se actualiza [[data-model-registry]] con las tablas `investments` e `investment_balance_history`, sus índices, relaciones, diagrama ER e índice de numeración. **No** se modifican [[presupuesto]] ni [[transacciones]]: se documenta explícitamente la decisión de **no** agregar `budgets.investment_id` (el patrón de presupuesto por ítem de [[ahorros-y-metas]] no se extiende a este módulo) ni `transactions.investment_id`. Se confirma `RN-094` de [[reportes]] sin cambios. Se agregan dos ítems a [[backlog]]: catálogo administrable de grupos/tipos de activo y vínculo transacción ↔ instrumento. Sigue pendiente la corrección de `RN-087` de [[reportes]]. |
 | 2026-08-23 | **Corrección de numeración, detectada al iniciar la construcción en código**: este documento se había numerado (CU-042 a CU-047, RN-140 a RN-181, `VALIDATION_026`–`VALIDATION_031`, `BIZ_026`–`BIZ_029`) sin consultar el estado real del índice — colisionaba enteramente con el módulo [[ahorros-y-metas]] (CU-042–048, RN-120–152, `VALIDATION_026`, `BIZ_026`), que se había cerrado y numerado correctamente una sesión antes. El índice de [[data-model-registry]] había sido editado para reflejar los números de Inversiones como si fueran los últimos usados, sin partir del máximo real dejado por Ahorros — el mismo tipo de error que Ahorros mismo había cometido y corregido respecto a Transacciones/Presupuesto/Categorías. Se renumeró todo el documento a la siguiente secuencia libre: `CU-042`→`CU-049` … `CU-047`→`CU-054`; `RN-140`→`RN-153` … `RN-181`→`RN-194`; `VALIDATION_026`→`VALIDATION_027` … `VALIDATION_031`→`VALIDATION_032`; `BIZ_026`→`BIZ_027` … `BIZ_029`→`BIZ_030`. Ningún otro documento cambió sus propios números — solo se corrigieron las referencias colisionadas dentro de este archivo y en [[data-model-registry]]. El archivo `registro-actualizacion-inversiones.md` mencionado en la sección "Cambios en otros documentos" nunca llegó a crearse; el registro se actualiza directamente en [[data-model-registry]] al cerrar la construcción. | CU-049 a CU-054 | Se corrige el índice de numeración de [[data-model-registry]]. |
 

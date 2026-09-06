@@ -222,3 +222,20 @@ export function computeContributionPlan(
     rows,
   }
 }
+
+// Tolerancia de desvío respecto al porcentaje objetivo, en puntos porcentuales. Dentro de ella un
+// instrumento se considera en su sitio: una cartera nunca cuadra al decimal, y pintar de color cada
+// desviación mínima haría que el color dejara de significar algo.
+export const ALLOCATION_TOLERANCE_PP = 2
+
+export type AllocationDrift = 'under' | 'onTarget' | 'over'
+
+// Dónde está un instrumento respecto a su objetivo. Con objetivo de 10%, por debajo de 8% está
+// `under`, por encima de 12% está `over`, y en medio `onTarget`.
+export function classifyAllocation(actual: number | undefined, objetivo: number): AllocationDrift {
+  if (actual === undefined) return 'onTarget'
+  const desvio = actual - objetivo
+  if (desvio <= -ALLOCATION_TOLERANCE_PP) return 'under'
+  if (desvio >= ALLOCATION_TOLERANCE_PP) return 'over'
+  return 'onTarget'
+}

@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { formatCurrency } from '@/lib/accounts'
-import type { Investment, InvestmentStatus } from '@/lib/investments'
+import { formatCurrency, formatCurrencySigned } from '@/lib/accounts'
+import { classifyAllocation, type Investment, type InvestmentStatus } from '@/lib/investments'
 import { cn, formatPercent as formatPercentValue } from '@/lib/utils'
 
 export interface PortfolioTableRow {
@@ -21,6 +21,25 @@ export interface PortfolioTableRow {
 
 function formatPercent(value: number | undefined): string {
   return value === undefined ? '—' : formatPercentValue(value)
+}
+
+// Formato condicional de las columnas de diagnóstico. Todas miden lo mismo —qué tan lejos está un
+// instrumento de su objetivo— pero responden preguntas distintas, y por eso no comparten paleta.
+
+// "Current %" dice hacia qué lado se desvió la cartera: rojo por debajo del objetivo, verde por
+// encima, y sin color mientras esté dentro de la tolerancia.
+function currentPercentClass(actual: number | undefined, objetivo: number): string {
+  const drift = classifyAllocation(actual, objetivo)
+  if (drift === 'under') return 'text-destructive'
+  if (drift === 'over') return 'text-success'
+  return 'text-card-foreground'
+}
+
+// "New %" responde otra cosa: si la aportación simulada alcanza a acercar el instrumento a su
+// objetivo. Ahí la dirección del desvío da igual —quedarse corto y pasarse son el mismo problema—,
+// así que un solo color de advertencia marca lo que sigue lejos.
+function newPercentClass(nuevo: number | undefined, objetivo: number): string {
+  return classifyAllocation(nuevo, objetivo) === 'onTarget' ? 'text-card-foreground' : 'text-warning'
 }
 
 // CU-050 (lectura) / CU-052 (edición en lote) — un solo componente para ambas tablas del
@@ -134,22 +153,45 @@ export function PortfolioTable({
                           {formatPercent(row.investment.porcentaje_objetivo)}
                         </TableCell>
                         <TableCell className="text-right font-mono">{formatCurrency(row.investment.balance_actual)}</TableCell>
-                        <TableCell className="text-right font-mono">{formatPercent(row.porcentajeActual)}</TableCell>
+                        <TableCell
+                          className={cn(
+                            'text-right font-mono',
+                            currentPercentClass(row.porcentajeActual, row.investment.porcentaje_objetivo),
+                          )}
+                        >
+                          {formatPercent(row.porcentajeActual)}
+                        </TableCell>
                         <TableCell
                           className={cn(
                             'text-right font-mono',
                             (row.diferencia ?? 0) < 0 ? 'text-destructive' : 'text-success',
                           )}
                         >
-                          {row.diferencia === undefined ? '—' : formatCurrency(row.diferencia)}
+                          {row.diferencia === undefined ? '—' : formatCurrencySigned(row.diferencia)}
                         </TableCell>
                         {showSimulation && (
-                          <TableCell className="text-right font-mono text-card-foreground">
+                          <TableCell
+                            className={cn(
+                              'text-right font-mono',
+                              // Sin aportación sugerida no hay nada que hacer con esta fila: en gris
+                              // deja de competir por la atención con las que sí reciben dinero.
+                              (row.suggestedContribution ?? 0) > 0
+                                ? 'text-card-foreground'
+                                : 'text-muted-foreground',
+                            )}
+                          >
                             {formatCurrency(row.suggestedContribution ?? 0)}
                           </TableCell>
                         )}
                         {showSimulation && (
-                          <TableCell className="text-right font-mono">{formatPercent(row.newPercent)}</TableCell>
+                          <TableCell
+                            className={cn(
+                              'text-right font-mono',
+                              newPercentClass(row.newPercent, row.investment.porcentaje_objetivo),
+                            )}
+                          >
+                            {formatPercent(row.newPercent)}
+                          </TableCell>
                         )}
                         <TableCell className="text-right text-xs text-muted-foreground">
                           {row.updatedAt ?? '—'}
@@ -230,21 +272,44 @@ export function PortfolioTable({
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Current % / Diff</p>
-                        <p
-                          className={cn(
-                            'font-mono',
-                            (row.diferencia ?? 0) < 0 ? 'text-destructive' : 'text-success',
-                          )}
-                        >
-                          {formatPercent(row.porcentajeActual)} ·{' '}
-                          {row.diferencia === undefined ? '—' : formatCurrency(row.diferencia)}
+                        <p className="font-mono">
+                          <span
+                            className={currentPercentClass(
+                              row.porcentajeActual,
+                              row.investment.porcentaje_objetivo,
+                            )}
+                          >
+                            {formatPercent(row.porcentajeActual)}
+                          </span>
+                          <span className="text-muted-foreground"> · </span>
+                          <span
+                            className={
+                              (row.diferencia ?? 0) < 0 ? 'text-destructive' : 'text-success'
+                            }
+                          >
+                            {row.diferencia === undefined ? '—' : formatCurrencySigned(row.diferencia)}
+                          </span>
                         </p>
                       </div>
                       {showSimulation && (
                         <div>
                           <p className="text-xs text-muted-foreground">Suggested / New %</p>
-                          <p className="font-mono text-card-foreground">
-                            {formatCurrency(row.suggestedContribution ?? 0)} · {formatPercent(row.newPercent)}
+                          <p className="font-mono">
+                            <span
+                              className={
+                                (row.suggestedContribution ?? 0) > 0
+                                  ? 'text-card-foreground'
+                                  : 'text-muted-foreground'
+                              }
+                            >
+                              {formatCurrency(row.suggestedContribution ?? 0)}
+                            </span>
+                            <span className="text-muted-foreground"> · </span>
+                            <span
+                              className={newPercentClass(row.newPercent, row.investment.porcentaje_objetivo)}
+                            >
+                              {formatPercent(row.newPercent)}
+                            </span>
                           </p>
                         </div>
                       )}
