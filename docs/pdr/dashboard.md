@@ -400,10 +400,11 @@ _No aplica — este CU no captura datos, solo consulta información existente._
 - RN-237: El gasto del ciclo de una tarjeta es la suma, en valor absoluto, de los montos de
   `transactions` con `tipo = gasto` de esa cuenta dentro del ciclo resuelto por RN-236; se compara
   contra `gasto_minimo_mensual` y ambas cifras se muestran juntas en un chip al lado del saldo. Si
-  `gasto_minimo_mensual` es `0` o no está configurado, el chip no aparece y la card conserva la
-  misma estructura, que es la razón de que este dato sea un chip y no una segunda barra de progreso:
-  solo algunas tarjetas tienen mínimo, y colgar de él un bloque entero hacía que unas cards se
-  estructuraran distinto de otras dentro de la misma cuadrícula.
+  `gasto_minimo_mensual` es `0` o no está configurado, el chip no aparece **pero su espacio se
+  reserva igual**, de modo que dos cards lado a lado empiecen el nombre a la misma altura tenga una
+  mínimo y la otra no. Esa es la razón de que el dato sea un chip en un hueco fijo y no una segunda
+  barra de progreso: solo algunas tarjetas tienen mínimo, y colgar de él un bloque entero hacía que
+  unas cards se estructuraran distinto de otras dentro de la misma cuadrícula.
   **Corrige RN-084 de [[reportes]]** en el mismo sentido que RN-236.
 - RN-331: Las cards de cuenta de débito/efectivo (CU-061) y las de tarjeta de crédito (CU-063)
   comparten estructura: nombre y saldo juntos en el centro, y un solo renglón anclado al pie. Lo que

@@ -46,18 +46,20 @@ export function CreditBalanceCard({ account, cycleSpend }: { account: Account; c
       <div className="relative flex h-full flex-col p-4">
         <div className="flex flex-1 flex-col justify-center gap-1.5">
           <p className="truncate text-sm font-medium text-white/80">{account.nombre}</p>
-          {/* El avance del ciclo es un chip junto al saldo y ya no una segunda barra: así la card
-              mide y se estructura igual tenga o no `gasto_minimo_mensual` configurado, en vez de
-              crecer un bloque entero solo para las tarjetas que lo tienen. `flex-wrap` es la válvula
-              de escape cuando el saldo es largo y no caben los dos en el renglón. */}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <p className="font-mono text-2xl font-medium text-white">{formatCurrency(account.saldo_actual)}</p>
-            {showCycle && (
-              <span className="shrink-0 rounded-full bg-white/15 px-2 py-0.5 text-[10px] text-white/80">
-                Cycle: {formatCurrency(cycleSpend!.gasto_ciclo_actual)} / {formatCurrency(gastoMinimo)}
-              </span>
-            )}
-          </div>
+          <p className="font-mono text-2xl font-medium text-white">{formatCurrency(account.saldo_actual)}</p>
+        </div>
+
+        {/* El hueco del chip se reserva siempre, tenga o no la tarjeta un mínimo configurado. Es la
+            única forma de que dos cards lado a lado empiecen el nombre a la misma altura: dentro del
+            bloque centrado, el chip lo hacía más alto y empujaba el nombre hacia arriba solo en las
+            tarjetas que lo tienen. Aquí el espacio existe siempre y lo único que cambia es si está
+            ocupado. */}
+        <div className="flex h-6 shrink-0 items-center">
+          {showCycle && (
+            <span className="truncate rounded-full bg-white/15 px-2 py-0.5 text-[10px] text-white/80">
+              Cycle: {formatCurrency(cycleSpend!.gasto_ciclo_actual)} / {formatCurrency(gastoMinimo)}
+            </span>
+          )}
         </div>
 
         <div>
