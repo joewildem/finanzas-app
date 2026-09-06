@@ -11,7 +11,6 @@ import {
 import { EmptyState } from '@/components/empty-state'
 import { useAccounts } from '@/hooks/use-accounts'
 import { useAccountsMonthlyBalance } from '@/hooks/use-accounts-monthly-balance'
-import { useCreditCardsCycleSpend } from '@/hooks/use-credit-cards-cycle-spend'
 import { useCreditCardsMonthlySpendHistory } from '@/hooks/use-credit-cards-monthly-spend-history'
 import { formatCurrency } from '@/lib/accounts'
 import { computeNavigableYearRange, sortByBalanceDesc, sortDebitCashAccounts } from '@/lib/dashboard'
@@ -48,7 +47,6 @@ export function BalanceTab() {
 
   const { meses: mesesBalance } = useAccountsMonthlyBalance(anioBalance)
   const { meses: mesesCredito } = useCreditCardsMonthlySpendHistory(credito, anioCredito)
-  const { spendByAccount: cycleSpendByAccount } = useCreditCardsCycleSpend(credito)
 
   const balanceChartData: MonthlyChartPoint[] = (mesesBalance ?? []).map((point) => {
     const row: MonthlyChartPoint = { mes: point.mes }
@@ -114,7 +112,7 @@ export function BalanceTab() {
           items={credito}
           keyOf={(account) => account.id}
           renderItem={(account) => (
-            <CreditBalanceCard account={account} cycleSpend={cycleSpendByAccount?.[account.id]} />
+            <CreditBalanceCard account={account} />
           )}
         />
       )}
