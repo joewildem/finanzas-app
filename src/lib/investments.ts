@@ -98,10 +98,38 @@ export function computeInactiveStats(
   }))
 }
 
+// Un color fijo por categoría, no asignado por posición: así un grupo conserva su identidad aunque
+// cambie el orden de la barra al moverse los balances. Los tonos se eligieron alejados entre sí en
+// el círculo cromático, porque los segmentos de una barra apilada se tocan y dos hues vecinos se
+// leerían como uno solo. "Crypto" comparte color en ambos catálogos, ya que es la misma cosa.
+export const INVESTMENT_GROUP_COLORS: Record<InvestmentGroup, string> = {
+  'Large Cap': '#3b82f6',
+  'Small Cap': '#06b6d4',
+  REIT: '#84cc16',
+  'Developed Markets': '#8b5cf6',
+  'Emerging Markets': '#ec4899',
+  'Treasury Bonds': '#14b8a6',
+  Crypto: '#f59e0b',
+  Retirement: '#ef4444',
+}
+
+export const INVESTMENT_TYPE_COLORS: Record<InvestmentType, string> = {
+  Stock: '#ec4899',
+  ETF: '#3b82f6',
+  Bond: '#14b8a6',
+  Fund: '#8b5cf6',
+  Crypto: '#f59e0b',
+  'Real Estate': '#84cc16',
+  PPR: '#ef4444',
+}
+
+const FALLBACK_EXPOSURE_COLOR = '#94a3b8'
+
 export interface ExposureBreakdownRow {
   key: string
   monto: number
   porcentaje: number | undefined
+  color: string
 }
 
 // RN-151 — desglose calculado sobre total_general (activos e inactivos), no sobre el conjunto activo.
@@ -115,11 +143,14 @@ export function computeExposureBreakdown(
     const key = investment[groupBy]
     totals.set(key, (totals.get(key) ?? 0) + investment.balance_actual)
   }
+  const palette: Record<string, string> =
+    groupBy === 'grupo_activo' ? INVESTMENT_GROUP_COLORS : INVESTMENT_TYPE_COLORS
   return [...totals.entries()]
     .map(([key, monto]) => ({
       key,
       monto,
       porcentaje: totalGeneral > 0 ? (monto / totalGeneral) * 100 : undefined,
+      color: palette[key] ?? FALLBACK_EXPOSURE_COLOR,
     }))
     .sort((a, b) => b.monto - a.monto)
 }

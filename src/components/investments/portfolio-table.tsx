@@ -1,7 +1,10 @@
+import { useMemo, useState } from 'react'
+
 import { CurrencyInput } from '@/components/accounts/currency-input'
 import { DeleteInvestmentDialog } from '@/components/investments/delete-investment-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCurrency, formatCurrencySigned } from '@/lib/accounts'
@@ -42,6 +45,42 @@ function newPercentClass(nuevo: number | undefined, objetivo: number): string {
   return classifyAllocation(nuevo, objetivo) === 'onTarget' ? 'text-card-foreground' : 'text-warning'
 }
 
+// Cada opción combina campo y dirección en un solo control: son seis combinaciones y separarlas en
+// dos controles obligaría a dos clics para llegar a cualquiera. "Target %" no aparece en la tabla de
+// inactivos porque ahí esa columna no existe — un instrumento inactivo no participa en la
+// distribución objetivo (RN-163).
+type SortValue =
+  | 'ticker-asc'
+  | 'ticker-desc'
+  | 'target-desc'
+  | 'target-asc'
+  | 'balance-desc'
+  | 'balance-asc'
+
+const SORT_OPTIONS: { value: SortValue; label: string; variants: readonly ('active' | 'inactive')[] }[] = [
+  { value: 'ticker-asc', label: 'Ticker A–Z', variants: ['active', 'inactive'] },
+  { value: 'ticker-desc', label: 'Ticker Z–A', variants: ['active', 'inactive'] },
+  { value: 'target-desc', label: 'Target % (high to low)', variants: ['active'] },
+  { value: 'target-asc', label: 'Target % (low to high)', variants: ['active'] },
+  { value: 'balance-desc', label: 'Balance (high to low)', variants: ['active', 'inactive'] },
+  { value: 'balance-asc', label: 'Balance (low to high)', variants: ['active', 'inactive'] },
+]
+
+function sortRows(rows: PortfolioTableRow[], sort: SortValue): PortfolioTableRow[] {
+  const [field, direction] = sort.split('-') as ['ticker' | 'target' | 'balance', 'asc' | 'desc']
+  const signo = direction === 'asc' ? 1 : -1
+  return [...rows].sort((a, b) => {
+    if (field === 'ticker') return signo * a.investment.ticker.localeCompare(b.investment.ticker)
+    const va =
+      field === 'target' ? a.investment.porcentaje_objetivo : a.investment.balance_actual
+    const vb =
+      field === 'target' ? b.investment.porcentaje_objetivo : b.investment.balance_actual
+    // Empate resuelto por ticker para que el orden sea estable: dos instrumentos con el mismo
+    // objetivo no deben intercambiarse de lugar entre renders.
+    return va === vb ? a.investment.ticker.localeCompare(b.investment.ticker) : signo * (va - vb)
+  })
+}
+
 // CU-050 (lectura) / CU-052 (edición en lote) — un solo componente para ambas tablas del
 // portafolio, parametrizado por `variant` (columnas de diagnóstico distintas: activos muestran
 // %actual/diferencia, inactivos muestran %del total) y por `editing` (mismas columnas de edición
@@ -72,9 +111,33 @@ export function PortfolioTable({
   onDeleted: () => void
   emptyMessage: string
 }) {
+  const [sort, setSort] = useState<SortValue>('ticker-asc')
+  const options = SORT_OPTIONS.filter((option) => option.variants.includes(variant))
+  const sortedRows = useMemo(() => sortRows(rows, sort), [rows, sort])
+
   return (
     <div className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium text-foreground">{title}</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-medium text-foreground">{title}</h2>
+        {rows.length > 1 && (
+          <Select value={sort} onValueChange={(value) => value && setSort(value as SortValue)}>
+            <SelectTrigger size="sm" className="w-52" aria-label={`Sort ${title.toLowerCase()}`}>
+              <SelectValue>
+                {(value: SortValue) =>
+                  `Sort by ${SORT_OPTIONS.find((o) => o.value === value)?.label ?? ''}`
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
 
       {rows.length === 0 ? (
         <Card>
@@ -117,7 +180,7 @@ export function PortfolioTable({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => (
+                {sortedRows.map((row) => (
                   <TableRow key={row.investment.id}>
                     <TableCell className="font-medium text-card-foreground">{row.investment.ticker}</TableCell>
                     <TableCell className="max-w-48 truncate text-muted-foreground">{row.investment.nombre}</TableCell>
@@ -221,7 +284,7 @@ export function PortfolioTable({
           </div>
 
           <div className="flex flex-col gap-3 md:hidden">
-            {rows.map((row) => (
+            {sortedRows.map((row) => (
               <Card key={row.investment.id}>
                 <CardContent className="flex flex-col gap-3">
                   <div className="flex items-center justify-between">
