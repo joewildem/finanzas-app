@@ -57,7 +57,7 @@ export function AccountCardTile({ account }: { account: Account }) {
         {/* Nombre y saldo van juntos y centrados, igual que en CreditBalanceCard: son el mismo dato
             —de qué cuenta y cuánto tiene— y separarlos obligaba a leer la card de arriba abajo para
             armarlo. El tipo se queda solo al pie, que es información de contexto. */}
-        <div className="flex flex-1 flex-col justify-center gap-1.5">
+        <div className="flex flex-1 flex-col justify-center gap-1 pt-4">
           <p className="truncate text-sm font-medium text-white/80">{account.nombre}</p>
           <p className="font-mono text-2xl font-medium text-white">
             {formatCurrency(account.saldo_actual)}
