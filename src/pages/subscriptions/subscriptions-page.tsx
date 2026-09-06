@@ -8,70 +8,77 @@ import { MonthlyEvolutionCard, type MonthlyEvolutionPoint } from '@/components/s
 import { SubscriptionCalendarCard } from '@/components/subscriptions/subscription-calendar-card'
 import { SubscriptionCard } from '@/components/subscriptions/subscription-card'
 import { SubscriptionFormDialog } from '@/components/subscriptions/subscription-form-dialog'
-import { UpcomingChargesCard } from '@/components/subscriptions/upcoming-charges-card'
+import { SubscriptionsDrawer } from '@/components/subscriptions/subscriptions-drawer'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { useSubscriptionPayments } from '@/hooks/use-subscription-payments'
 import { useSubscriptions } from '@/hooks/use-subscriptions'
 import { formatCurrency } from '@/lib/accounts'
 import { currentMonthKey, monthKeyLabel, shiftMonthKey } from '@/lib/budgets'
 import {
   computeChargedInRange,
   computeMonthlyNormalized,
+  computeMonthStatus,
   computeOccurrences,
-  computeUpcomingCharges,
   isLiveInRange,
   SUBSCRIPTION_CATEGORY_COLORS,
   SUBSCRIPTION_CATEGORY_LABELS,
+  type MonthStatus,
   type Subscription,
   type SubscriptionCategory,
 } from '@/lib/subscriptions'
+import { cn } from '@/lib/utils'
 
-const UPCOMING_DAYS = 30
-
-type SortKey = 'name' | 'amount'
+type SortKey = 'due' | 'amount' | 'name'
 
 const SORT_LABELS: Record<SortKey, string> = {
-  name: 'Name',
+  due: 'Next charge',
   amount: 'Annual cost',
+  name: 'Name',
 }
 
 function SummaryCard({
   label,
   value,
   hint,
+  valueClassName,
 }: {
   label: string
   value: string
   hint?: string
+  valueClassName?: string
 }) {
   return (
     <Card>
       <CardContent className="flex flex-col gap-1">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="font-mono text-2xl font-medium text-card-foreground">{value}</p>
+        <p className={cn('font-mono text-2xl font-medium text-card-foreground', valueClassName)}>{value}</p>
         {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       </CardContent>
     </Card>
   )
 }
 
-// CU-079 — pantalla única del módulo. Un solo navegador de mes gobierna todo lo que se ve: las tres
-// cards, las dos gráficas y el calendario. La alternativa —un selector de año para las gráficas y
-// un mes propio para el calendario— dejaba cuatro nociones de tiempo conviviendo en la misma
-// pantalla, y con ellas la posibilidad de que dos bloques hablaran de periodos distintos sin avisar.
+// CU-079 — pantalla única del módulo. Un solo navegador de mes gobierna todo lo que se ve: las
+// cuatro cards, el listado, las dos gráficas y el calendario. La alternativa —un selector de año
+// para las gráficas y un mes propio para el calendario— dejaba cuatro nociones de tiempo
+// conviviendo en la misma pantalla, y con ellas la posibilidad de que dos bloques hablaran de
+// periodos distintos sin avisar.
 //
-// "Next 30 days" es la única excepción, y a propósito: cuenta desde hoy, no desde el mes visible,
-// porque la pregunta que responde ("¿qué me van a cobrar?") solo tiene sentido en presente.
+// El listado muestra **solo lo que cobra en el mes visible**, no todo lo contratado: una anual
+// aparece únicamente en su mes de cobro. El inventario completo vive en el panel lateral de "View
+// all", que es donde tiene sentido preguntarse qué se tiene en total.
 export function SubscriptionsPage() {
   const { subscriptions, refetch } = useSubscriptions()
   const [mes, setMes] = useState(currentMonthKey())
   const [addOpen, setAddOpen] = useState(false)
-  const [sortBy, setSortBy] = useState<SortKey>('name')
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [sortBy, setSortBy] = useState<SortKey>('due')
 
   // Estable durante la vida de la pantalla: "hoy" no debe moverse entre renders, o el calendario y
-  // la lista de próximos cobros podrían discrepar a medianoche.
+  // las fechas de cobro podrían discrepar a medianoche.
   const today = useMemo(() => new Date(), [])
 
   const all = useMemo(() => subscriptions ?? [], [subscriptions])
@@ -87,12 +94,19 @@ export function SubscriptionsPage() {
     }
   }, [mes])
 
-  // Las tres cards y el listado hablan del mes visible, incluidas las archivadas que todavía
-  // estaban vivas entonces: navegar a enero muestra enero, no lo que está vigente hoy.
-  const liveThisMonth = useMemo(
-    () => all.filter((sub) => isLiveInRange(sub, monthStart, monthEnd)),
-    [all, monthStart, monthEnd],
-  )
+  const { paid, setPaid } = useSubscriptionPayments(monthStart, monthEnd)
+
+  // El listado son las que tienen al menos un cobro en el mes visible, con su estado de pago ya
+  // resuelto: la card necesita saber cuál es el siguiente pendiente y cuántos van.
+  const delMes = useMemo(() => {
+    const vacio: ReadonlySet<string> = new Set()
+    return all
+      .map((subscription) => ({
+        subscription,
+        status: computeMonthStatus(subscription, monthStart, monthEnd, paid ?? vacio),
+      }))
+      .filter((entry) => entry.status.charges.length > 0)
+  }, [all, monthStart, monthEnd, paid])
 
   const chargedThisMonth = useMemo(
     () => computeChargedInRange(all, monthStart, monthEnd),
@@ -103,8 +117,15 @@ export function SubscriptionsPage() {
     [all, yearStart, yearEnd],
   )
   const normalizedMonthly = useMemo(
-    () => liveThisMonth.reduce((sum, sub) => sum + computeMonthlyNormalized(sub), 0),
-    [liveThisMonth],
+    () =>
+      all
+        .filter((sub) => isLiveInRange(sub, monthStart, monthEnd))
+        .reduce((sum, sub) => sum + computeMonthlyNormalized(sub), 0),
+    [all, monthStart, monthEnd],
+  )
+  const pendingThisMonth = useMemo(
+    () => delMes.reduce((sum, entry) => sum + entry.status.pendingAmount, 0),
+    [delMes],
   )
 
   const categoryRows = useMemo<CategoryBreakdownRow[]>(() => {
@@ -136,15 +157,26 @@ export function SubscriptionsPage() {
     [all, anio],
   )
 
-  const upcoming = useMemo(() => computeUpcomingCharges(all, today, UPCOMING_DAYS), [all, today])
-
   const sorted = useMemo(() => {
-    const rows = [...liveThisMonth]
+    const rows = [...delMes]
     if (sortBy === 'amount') {
-      rows.sort((a, b) => computeMonthlyNormalized(b) - computeMonthlyNormalized(a))
+      rows.sort((a, b) => computeMonthlyNormalized(b.subscription) - computeMonthlyNormalized(a.subscription))
+    } else if (sortBy === 'name') {
+      rows.sort((a, b) => a.subscription.nombre.localeCompare(b.subscription.nombre))
+    } else {
+      // Por fecha de cobro: primero lo que sigue pendiente, y lo ya pagado al final — una vez
+      // saldada, la suscripción deja de reclamar atención.
+      rows.sort((a, b) => {
+        const fa = a.status.next
+        const fb = b.status.next
+        if (fa && fb) return fa.getTime() - fb.getTime()
+        if (fa) return -1
+        if (fb) return 1
+        return a.subscription.nombre.localeCompare(b.subscription.nombre)
+      })
     }
     return rows
-  }, [liveThisMonth, sortBy])
+  }, [delMes, sortBy])
 
   const mesLabel = monthKeyLabel(mes)
   const mesLabelCorto = format(parse(mes, 'yyyy-MM', new Date()), 'MMM')
@@ -155,54 +187,71 @@ export function SubscriptionsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-medium text-foreground">Subscriptions</h1>
-            <p className="text-sm text-muted-foreground">
-              Track what you pay for and when it renews.
-            </p>
+            <p className="text-sm text-muted-foreground">Track what you pay for and when it renews.</p>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon-sm" aria-label="Previous month" onClick={() => setMes(shiftMonthKey(mes, -1))}>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="Previous month"
+              onClick={() => setMes(shiftMonthKey(mes, -1))}
+            >
               <HugeiconsIcon icon={ArrowLeft01Icon} />
             </Button>
             <span className="min-w-36 text-center text-sm font-medium text-foreground">{mesLabel}</span>
-            <Button variant="outline" size="icon-sm" aria-label="Next month" onClick={() => setMes(shiftMonthKey(mes, 1))}>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="Next month"
+              onClick={() => setMes(shiftMonthKey(mes, 1))}
+            >
               <HugeiconsIcon icon={ArrowRight01Icon} />
             </Button>
             <Button onClick={() => setAddOpen(true)}>Add subscription</Button>
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryCard
             label={`Charged in ${mesLabel}`}
             value={formatCurrency(chargedThisMonth)}
             hint={`${formatCurrency(normalizedMonthly)}/mo on average`}
           />
+          <SummaryCard
+            label="Left to pay"
+            value={formatCurrency(pendingThisMonth)}
+            hint={pendingThisMonth === 0 ? 'Everything is settled' : `of ${formatCurrency(chargedThisMonth)}`}
+            valueClassName={pendingThisMonth === 0 ? 'text-success' : undefined}
+          />
           <SummaryCard label={`Charged in ${anio}`} value={formatCurrency(chargedThisYear)} />
           <SummaryCard
             label="Active"
-            value={String(sorted.length)}
-            hint={sorted.length === 1 ? 'subscription' : 'subscriptions'}
+            value={String(all.filter((sub) => isLiveInRange(sub, monthStart, monthEnd)).length)}
+            hint="subscriptions this month"
           />
         </div>
 
-        <UpcomingChargesCard charges={upcoming} today={today} />
-
         <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-medium text-foreground">Active in {mesLabel}</h2>
-            <Select value={sortBy} onValueChange={(value) => value && setSortBy(value as SortKey)}>
-              <SelectTrigger className="w-44" aria-label="Sort subscriptions">
-                <SelectValue>{(value: SortKey) => `Sort by ${SORT_LABELS[value].toLowerCase()}`}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
-                  <SelectItem key={key} value={key}>
-                    {SORT_LABELS[key]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-medium text-foreground">Charged in {mesLabel}</h2>
+            <div className="flex items-center gap-2">
+              <Select value={sortBy} onValueChange={(value) => value && setSortBy(value as SortKey)}>
+                <SelectTrigger className="w-44" aria-label="Sort subscriptions">
+                  <SelectValue>{(value: SortKey) => `Sort by ${SORT_LABELS[value].toLowerCase()}`}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {SORT_LABELS[key]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={() => setDrawerOpen(true)}>
+                View all
+              </Button>
+            </div>
           </div>
 
           {subscriptions === undefined ? (
@@ -211,14 +260,21 @@ export function SubscriptionsPage() {
             <Card>
               <CardContent>
                 <p className="py-8 text-center text-sm text-muted-foreground">
-                  No subscriptions for this month yet.
+                  Nothing is charged this month.
                 </p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {sorted.map((subscription: Subscription) => (
-                <SubscriptionCard key={subscription.id} subscription={subscription} onChanged={refetch} />
+              {sorted.map(({ subscription, status }: { subscription: Subscription; status: MonthStatus }) => (
+                <SubscriptionCard
+                  key={subscription.id}
+                  subscription={subscription}
+                  monthStatus={status}
+                  today={today}
+                  onTogglePaid={setPaid}
+                  onChanged={refetch}
+                />
               ))}
             </div>
           )}
@@ -231,12 +287,13 @@ export function SubscriptionsPage() {
 
         <SubscriptionCalendarCard mes={monthStart} subscriptions={all} today={today} />
 
-        <SubscriptionFormDialog
-          mode="create"
-          open={addOpen}
-          onOpenChange={setAddOpen}
-          onSuccess={refetch}
+        <SubscriptionsDrawer
+          subscriptions={all}
+          today={today}
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
         />
+        <SubscriptionFormDialog mode="create" open={addOpen} onOpenChange={setAddOpen} onSuccess={refetch} />
       </div>
     </TooltipProvider>
   )

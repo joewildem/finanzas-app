@@ -125,6 +125,7 @@ function ChartTooltipContent({
   labelFormatter,
   labelClassName,
   formatter,
+  valueFormatter,
   color,
   nameKey,
   labelKey,
@@ -135,6 +136,8 @@ function ChartTooltipContent({
     indicator?: "line" | "dot" | "dashed"
     nameKey?: string
     labelKey?: string
+    /** Formatea solo la cifra del renglon, dejando el resto del tooltip intacto. */
+    valueFormatter?: (value: number) => string
   } & Omit<
     RechartsPrimitive.DefaultTooltipContentProps<
       TooltipValueType,
@@ -253,7 +256,9 @@ function ChartTooltipContent({
                       {item.value != null && (
                         <span className="font-mono font-medium text-foreground tabular-nums">
                           {typeof item.value === "number"
-                            ? item.value.toLocaleString()
+                            ? (valueFormatter ?? ((value: number) => value.toLocaleString()))(
+                                item.value
+                              )
                             : String(item.value)}
                         </span>
                       )}

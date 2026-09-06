@@ -1,6 +1,7 @@
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from 'recharts'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatCurrency } from '@/lib/accounts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 
 const BAR_ROW_HEIGHT = 34
@@ -42,7 +43,7 @@ export function CategoryBreakdownCard({
               <CartesianGrid horizontal={false} />
               <XAxis type="number" hide />
               <YAxis dataKey="nombre" type="category" tickLine={false} axisLine={false} width={100} />
-              <ChartTooltip content={<ChartTooltipContent />} />
+              <ChartTooltip content={<ChartTooltipContent valueFormatter={formatCurrency} />} />
               <Bar dataKey="monto" radius={4}>
                 {rows.map((row) => (
                   <Cell key={row.categoria} fill={row.color} />

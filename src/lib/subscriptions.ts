@@ -1,4 +1,4 @@
-import { addDays, addMonths, differenceInCalendarDays, differenceInCalendarMonths } from 'date-fns'
+import { addDays, addMonths, differenceInCalendarDays, differenceInCalendarMonths, format } from 'date-fns'
 
 import { parseDate } from '@/lib/dates'
 
@@ -222,27 +222,6 @@ export function computeAnnualized(sub: Subscription): number {
   return computeMonthlyNormalized(sub) * 12
 }
 
-export interface UpcomingCharge {
-  subscription: Subscription
-  fecha: Date
-}
-
-// Los cobros de los próximos `days` días, en orden cronológico. Es la pregunta que uno le hace de
-// verdad a un tracker de suscripciones ("¿qué me viene?"), y aunque el calendario la contiene, ahí
-// hay que buscarla con la vista.
-export function computeUpcomingCharges(
-  subs: Subscription[],
-  today: Date,
-  days: number,
-): UpcomingCharge[] {
-  const to = addDays(today, days)
-  return subs
-    .flatMap((subscription) =>
-      computeOccurrences(subscription, today, to).map((fecha) => ({ subscription, fecha })),
-    )
-    .sort((a, b) => a.fecha.getTime() - b.fecha.getTime())
-}
-
 // El dominio desnudo a partir de lo que el usuario haya escrito en "Website": acepta
 // "https://www.netflix.com/mx", "netflix.com" o "www.netflix.com" y devuelve "netflix.com", que es
 // lo que espera la URL de logo. Devuelve null si no hay algo que parezca un dominio.
@@ -265,4 +244,57 @@ export function isLiveInRange(sub: Subscription, from: Date, to: Date): boolean 
   if (start > to) return false
   const cutoff = computeCutoff(sub)
   return cutoff === null || cutoff >= from
+}
+
+// --- Cobros pagados -------------------------------------------------------
+
+// Un cobro se identifica por la suscripción y su fecha, no por el mes: una semanal tiene cuatro
+// cargos en un mes y "pagada en septiembre" no diría cuál. Esta llave es la misma que la restricción
+// única de `subscription_payments`.
+export function chargeKey(subscriptionId: string, fecha: Date): string {
+  return `${subscriptionId}|${format(fecha, 'yyyy-MM-dd')}`
+}
+
+export interface MonthStatus {
+  /** Todas las fechas de cobro de la suscripción dentro del mes. */
+  charges: Date[]
+  /** Las que aún no se han marcado como pagadas, en orden. */
+  pending: Date[]
+  /** Lo que falta pagar de esta suscripción en el mes. */
+  pendingAmount: number
+  /** La siguiente por pagar, o null si ya no queda ninguna. */
+  next: Date | null
+}
+
+export function computeMonthStatus(
+  sub: Subscription,
+  from: Date,
+  to: Date,
+  paid: ReadonlySet<string>,
+): MonthStatus {
+  const charges = computeOccurrences(sub, from, to)
+  const pending = charges.filter((fecha) => !paid.has(chargeKey(sub.id, fecha)))
+  return {
+    charges,
+    pending,
+    pendingAmount: pending.length * sub.monto,
+    next: pending[0] ?? null,
+  }
+}
+
+// "Hoy" y "Mañana" se leen más rápido que una fecha cuando el cobro es inminente, que es justo
+// cuando importa alcanzar a cancelar. Hacia atrás la fecha sola basta: ya pasó.
+export function relativeDayLabel(fecha: Date, today: Date): string | null {
+  const days = differenceInCalendarDays(fecha, today)
+  if (days < 0) return null
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Tomorrow'
+  return `In ${days} days`
+}
+
+// La siguiente fecha de cobro a partir de hoy, mirando hasta un año adelante. Alimenta la columna
+// "Next due" del listado completo, donde una suscripción puede no cobrar en el mes visible.
+export function computeNextCharge(sub: Subscription, today: Date): Date | null {
+  const [next] = computeOccurrences(sub, today, addDays(today, 366))
+  return next ?? null
 }

@@ -1,6 +1,7 @@
 import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis } from 'recharts'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatCurrency } from '@/lib/accounts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 
 export interface MonthlyEvolutionPoint {
@@ -9,7 +10,8 @@ export interface MonthlyEvolutionPoint {
 }
 
 const chartConfig: ChartConfig = {
-  monto: { label: 'Charged', color: 'var(--chart-1)' },
+  // El lime de marca (`--color-brand`), el mismo del logotipo y de los acentos de la app.
+  monto: { label: 'Charged', color: 'var(--color-brand)' },
 }
 
 // CU-079 — evolución del gasto mes a mes dentro del año visible. Los doce meses aparecen siempre,
@@ -36,7 +38,7 @@ export function MonthlyEvolutionCard({
           <LineChart data={points} margin={{ left: 8, right: 8, top: 8 }}>
             <CartesianGrid vertical={false} />
             <XAxis dataKey="mesLabel" tickLine={false} axisLine={false} tickMargin={8} />
-            <ChartTooltip content={<ChartTooltipContent />} />
+            <ChartTooltip content={<ChartTooltipContent valueFormatter={formatCurrency} />} />
             <ReferenceLine x={mesLabelSeleccionado} stroke="var(--border)" strokeDasharray="4 4" />
             <Line
               dataKey="monto"

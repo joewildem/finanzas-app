@@ -17,6 +17,11 @@ import { cn } from '@/lib/utils'
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
+// Cuántos logos caben en una celda antes de que empiecen a competir con el monto, que es el dato
+// principal. A partir del quinto se resumen en un contador; el desglose completo sigue en el
+// emergente al pasar el cursor.
+const MAX_AVATARS = 4
+
 interface DayCharges {
   date: Date
   subs: Subscription[]
@@ -103,9 +108,24 @@ export function SubscriptionCalendarCard({
                   {hasCharges && <span className="mt-1 size-1.5 shrink-0 rounded-full bg-success" />}
                 </div>
                 {hasCharges && (
-                  <span className="truncate font-mono text-[11px] text-card-foreground">
-                    {formatCurrency(day.total)}
-                  </span>
+                  <div className="flex items-end justify-between gap-1">
+                    <span className="min-w-0 truncate font-mono text-[11px] text-card-foreground">
+                      {formatCurrency(day.total)}
+                    </span>
+                    {/* Los logos solo aparecen cuando la celda es lo bastante ancha para ellos. Con
+                        siete columnas repartiéndose la pantalla, por debajo de `lg` no queda espacio
+                        sin recortar el monto, y entre las dos cosas gana el monto. */}
+                    <div className="hidden shrink-0 items-center gap-0.5 lg:flex">
+                      {day.subs.slice(0, MAX_AVATARS).map((sub) => (
+                        <SubscriptionAvatar key={sub.id} subscription={sub} className="size-4 rounded-[3px]" />
+                      ))}
+                      {day.subs.length > MAX_AVATARS && (
+                        <span className="flex h-4 min-w-4 items-center justify-center rounded-[3px] bg-muted px-0.5 text-[9px] font-medium text-muted-foreground ring-1 ring-border">
+                          +{day.subs.length - MAX_AVATARS}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             )

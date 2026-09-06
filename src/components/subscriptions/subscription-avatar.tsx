@@ -57,9 +57,13 @@ export function SubscriptionAvatar({
   const url = domain ? sourceUrl(source, domain) : null
 
   return (
+    // Plano: sin anillo ni sombra, solo la imagen con las esquinas redondeadas. Los logos de
+    // Brandfetch y los favicons vienen cuadrados y a sangre, así que `object-cover` los deja llenar
+    // el marco sin recortar nada relevante. El `bg-muted` de abajo solo se asoma mientras la imagen
+    // carga o si el logo trae transparencia.
     <div
       className={cn(
-        'flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl ring-1 ring-border',
+        'flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted',
         className,
       )}
       style={url ? undefined : { backgroundColor: SUBSCRIPTION_CATEGORY_COLORS[subscription.categoria] }}
@@ -69,7 +73,7 @@ export function SubscriptionAvatar({
           src={url}
           alt=""
           loading="lazy"
-          className="size-full bg-white object-contain"
+          className="size-full object-cover"
           onLoad={(event) => {
             if (source === 'brandfetch' && event.currentTarget.naturalWidth <= PLACEHOLDER_MAX_PX) {
               setSource('duckduckgo')
