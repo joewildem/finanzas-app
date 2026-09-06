@@ -18,11 +18,11 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 
 |Contador|Último usado|Módulo de origen|
 |---|---|---|
-|Casos de uso (CU-XXX)|CU-077|msi|
-|Reglas de negocio (RN-XXX)|RN-293|creditos-deudas|
-|Errores de validación (VALIDATION_XXX)|VALIDATION_039|msi|
+|Casos de uso (CU-XXX)|CU-082|suscripciones|
+|Reglas de negocio (RN-XXX)|RN-320|suscripciones|
+|Errores de validación (VALIDATION_XXX)|VALIDATION_041|suscripciones|
 |Errores de autenticación/autorización (AUTH_XXX)|AUTH_003|auth|
-|Errores de lógica de negocio (BIZ_XXX)|BIZ_035|msi|
+|Errores de lógica de negocio (BIZ_XXX)|BIZ_036|suscripciones|
 |Errores de sistema (SYS_XXX)|SYS_001|cuentas|
 
 > Nota (2026-09-04): [[msi]] se construyó primero en código y se documentó después, a diferencia del resto del repositorio. Su numeración (CU-072 a CU-077, RN-270 a RN-289, `VALIDATION_038`/`VALIDATION_039`, `BIZ_034`/`BIZ_035`) se asignó al cerrar el documento, tomando los códigos que ya estaban en uso en las migraciones. La columna `budgets.msi_transaction_id`, introducida por la primera versión del módulo y retirada por la definitiva, no dejó números reservados.
@@ -459,6 +459,58 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |---|---|---|---|
 |`(user_id, msi_transaction_id, mes)`|Único|Un pago por plan y mes|CU-077|
 
+### `subscriptions`
+
+> Tabla nueva, introducida por [[suscripciones]]. Registra un servicio recurrente y **deriva** de él
+> todo su calendario de cobros: no existe ninguna tabla de ocurrencias ni de pagos. La fecha de
+> inicio y el ciclo bastan para reconstruir cualquier mes, pasado o futuro (RN-302, RN-303).
+>
+> Es la única tabla del registro **sin ninguna llave foránea fuera de `users`**, y la única cuyo
+> módulo no define funciones RPC. Ambas cosas son la misma decisión: un cobro de suscripción no
+> genera transacción, no consume presupuesto y no mueve el saldo de ninguna cuenta (RN-311), así que
+> no hay nada que coordinar en una transacción de base de datos ni ningún otro módulo al que
+> engancharse. `metodo_pago` guarda el **nombre** de una cuenta como texto y no su `id`,
+> deliberadamente: el formulario ofrece los nombres para no teclearlos, pero renombrar la cuenta
+> después no actualiza las suscripciones (RN-300).
+>
+> `categoria` tampoco reutiliza `categories`: es un catálogo cerrado de catorce valores propio del
+> módulo. Compartir la tabla de categorías habría llevado el gasto de suscripciones a los reportes de
+> gasto corriente (RN-295).
+
+```json
+{
+  "id": "uuid"
+}
+```
+
+|Campo|Tipo|Requerido|Default|Procedencia (CU)|
+|---|---|---|---|---|
+|`user_id`|uuid (FK → users.id, `on delete cascade`)|Sí|—|CU-078|
+|`nombre`|text|Sí|—|CU-078 (RN-294); 2-50 caracteres, único entre las activas|
+|`categoria`|text|Sí|—|CU-078 (RN-295); catálogo cerrado de 14 valores, sin relación con `categories`|
+|`sitio_web`|text|No|`null`|CU-078 (RN-299); dominio del servicio, alimenta el logo enlazado (RN-316)|
+|`monto`|numeric(14,2)|Sí|—|CU-078 (RN-297); mayor que cero|
+|`ciclo`|text|Sí|—|CU-078 (RN-296); `daily`, `weekly`, `monthly`, `quarterly`, `semiannual`, `annual`, `one_time`|
+|`fecha_inicio`|date|Sí|—|CU-078 (RN-303); ancla de todo el calendario de cobros|
+|`fecha_fin`|date|No|`null`|CU-078 (RN-298); igual o posterior a `fecha_inicio`|
+|`es_prueba`|boolean|Sí|`false`|CU-078 (RN-301); no altera ningún cálculo, solo destaca en pantalla|
+|`metodo_pago`|text|No|`null`|CU-078 (RN-300); nombre de cuenta como texto, **no** una FK|
+|`nota`|text|No|`null`|CU-078; ≤500 caracteres|
+|`status`|text|Sí|`'active'`|CU-081; `active` o `archived`|
+|`archivada_en`|date|No|`null`|CU-081 (RN-312); fecha del corte al archivar. Existe si y solo si `status = 'archived'`, garantizado por CHECK (RN-314)|
+|`created_at`|timestamptz|Sí|`now()`|CU-078|
+|`updated_at`|timestamptz|Sí|`now()`|CU-078|
+
+> Política RLS: `auth.uid() = user_id` en `select`, `insert` y `update`. **Sin política de
+> `delete`** — el módulo archiva, no borra (RN-315), mismo criterio que `savings_goals` y `debts`.
+
+**Índices**
+
+|Campos|Tipo|Propósito|Procedencia (CU)|
+|---|---|---|---|
+|`(user_id, nombre) where status = 'active'`|Único parcial|Nombre único entre activas; una archivada libera su nombre|CU-078 (RN-294)|
+|`(user_id, status)`|Índice|Listado por estatus|CU-079|
+
 ## Relaciones
 
 |Relación|Patrón (embebido / referenciado)|Cardinalidad|Justificación|Procedencia (CU)|
@@ -468,6 +520,7 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |`transactions.user_id` → `users`|Referenciado (FK)|1:N|Igual que `accounts.user_id`|CU-006; formalizado en CU-032|
 |`msi_payments.msi_transaction_id` → `transactions`|Referenciado (FK, cascada)|1:N (un plan, un pago por mes)|El plan es la compra misma (`tipo=compra_msi`), no una entidad aparte; sus pagos se borran con ella|CU-077 de [[msi]]|
 |`msi_payments.user_id` → `users`|Referenciado (FK)|1:N|Igual que el resto de las tablas del dominio|CU-077 de [[msi]]|
+|`subscriptions.user_id` → `users`|Referenciado (FK, cascada)|1:N|**Su única relación.** El módulo no toca `transactions`, `budgets`, `accounts` ni `categories`: un cobro de suscripción no genera transacción ni consume presupuesto (RN-311). `metodo_pago` guarda el nombre de una cuenta como texto, no su `id` (RN-300)|CU-078 de [[suscripciones]]|
 |`categories.user_id` → `users`|Referenciado (FK)|1:N|Igual que `accounts.user_id`|CU-007; formalizado en CU-032|
 |`categories.grupo_id` → `categories` (self)|Referenciado (FK)|1:N (un grupo, varias categorías)|Una sola tabla modela grupo y categoría, distinguidos explícitamente por `tipo`; deja la puerta abierta a que Créditos e Inversión la reutilicen sin rediseño|CU-007, CU-008|
 |`transactions.category_id` → `categories`|Referenciado (FK)|1:N (una categoría, varios movimientos)|Un gasto o ingreso pertenece a una categoría; se consulta con frecuencia para reportes por categoría|CU-013|
@@ -519,6 +572,7 @@ erDiagram
     DEBTS ||--o{ TRANSACTIONS : "recibe pagos"
     DEBTS ||--o{ BUDGETS : "presupuesta"
     USERS ||--o{ MSI_PAYMENTS : "posee"
+    USERS ||--o{ SUBSCRIPTIONS : "posee"
     TRANSACTIONS ||--o{ MSI_PAYMENTS : "recibe pagos de parcialidad"
     USERS {
         uuid id
@@ -617,9 +671,24 @@ erDiagram
         text mes
         numeric monto
     }
+    SUBSCRIPTIONS {
+        uuid id
+        uuid user_id
+        text nombre
+        text categoria
+        text sitio_web
+        numeric monto
+        text ciclo
+        date fecha_inicio
+        date fecha_fin
+        boolean es_prueba
+        text metodo_pago
+        text status
+        date archivada_en
+    }
 ```
 
-_(se agrega la entidad `USERS` tras el cierre de [[auth]], resolviendo las cuatro relaciones que quedaban pendientes desde el primer módulo. Se agrega la entidad `SAVINGS_GOALS` tras el cierre de [[ahorros-y-metas]]; `BUDGETS.categoria_reservada` fue reemplazado por `BUDGETS.meta_id` en el mismo cierre. Desde el 2026-08-22, todo el diagrama usa tipos Postgres nativos — ya no hay mezcla de notación Mongo/Postgres. Se agregan las entidades `INVESTMENTS` e `INVESTMENT_BALANCE_HISTORY` tras el cierre de [[inversiones]]: nótese que **`INVESTMENTS` solo se relaciona con `USERS` y con su propio histórico** — no toca `CATEGORIES`, `TRANSACTIONS` ni `BUDGETS`, por decisión explícita documentada en la sección de Relaciones. Se agrega la entidad `DEBTS` tras el cierre de [[creditos-deudas]], la última fase de Casos de uso y Requerimientos del alcance completo: a diferencia de `INVESTMENTS`, `DEBTS` sí se relaciona con `TRANSACTIONS` (vía `deuda_id`, mismo patrón de documento único que `SAVINGS_GOALS`) y con `BUDGETS` (vía `deuda_id`, un renglón presupuestable por deuda activa). Se agrega la entidad `NETWORTH_GOALS` tras documentarse la pestaña Networth de [[dashboard]]: única tabla del registro con relación `1:1` hacia `USERS` (`user_id` es su propia primary key, sin `id` propio) — no se relaciona con ninguna otra entidad.)_
+_(se agrega la entidad `USERS` tras el cierre de [[auth]], resolviendo las cuatro relaciones que quedaban pendientes desde el primer módulo. Se agrega la entidad `SAVINGS_GOALS` tras el cierre de [[ahorros-y-metas]]; `BUDGETS.categoria_reservada` fue reemplazado por `BUDGETS.meta_id` en el mismo cierre. Desde el 2026-08-22, todo el diagrama usa tipos Postgres nativos — ya no hay mezcla de notación Mongo/Postgres. Se agregan las entidades `INVESTMENTS` e `INVESTMENT_BALANCE_HISTORY` tras el cierre de [[inversiones]]: nótese que **`INVESTMENTS` solo se relaciona con `USERS` y con su propio histórico** — no toca `CATEGORIES`, `TRANSACTIONS` ni `BUDGETS`, por decisión explícita documentada en la sección de Relaciones. Se agrega la entidad `DEBTS` tras el cierre de [[creditos-deudas]], la última fase de Casos de uso y Requerimientos del alcance completo: a diferencia de `INVESTMENTS`, `DEBTS` sí se relaciona con `TRANSACTIONS` (vía `deuda_id`, mismo patrón de documento único que `SAVINGS_GOALS`) y con `BUDGETS` (vía `deuda_id`, un renglón presupuestable por deuda activa). Se agrega la entidad `NETWORTH_GOALS` tras documentarse la pestaña Networth de [[dashboard]]: única tabla del registro con relación `1:1` hacia `USERS` (`user_id` es su propia primary key, sin `id` propio) — no se relaciona con ninguna otra entidad. Se agrega la entidad `SUBSCRIPTIONS` tras el cierre de [[suscripciones]]: es el caso más extremo de aislamiento del registro — **su única arista es hacia `USERS`**, más aislada aún que `INVESTMENTS`, que al menos tiene su propio histórico. No comparte `CATEGORIES` (usa un catálogo propio) y su método de pago es texto, no una arista hacia `ACCOUNTS`.)_
 
 ## Conflictos sin resolver
 
@@ -648,7 +717,8 @@ _(ninguno por ahora. Si un módulo nuevo contradice una definición previa de un
 |2026-09-04|msi|Se documenta el módulo Meses Sin Intereses, construido primero en código y documentado después. Se agregan CU-072 a CU-077 (registrar, consultar, editar, eliminar y liquidar un plan; capturar el pago de una parcialidad) y RN-270 a RN-289. `transactions.tipo` gana el valor `compra_msi`, con tres campos propios (`msi_meses`, `msi_mes_inicio`, `msi_liquidado_mes`) y `category_id` forzosamente nulo: esa nulidad es estructural (RN-270) y es lo que mantiene estas compras fuera de las diez agregaciones de gasto del sistema sin que cada una deba excluirlas. Se agrega la tabla `msi_payments` (pago capturado a mano por plan y mes, RN-285) — no se reutilizó `budgets` porque ahí `monto` significa "lo que planeo asignar" y alimenta el dinero por repartir. [[presupuesto]] gana el grupo "Installments (MSI)", único cuyos renglones invierten el significado de asignado/real (RN-286): la mensualidad es derivada y fija, el pago es capturado y editable. RN-075 resta además el total de mensualidades del mes (RN-287). [[cuentas]] gana en el detalle de tarjeta el calendario de pagos y la amortización por plan (CU-073). Analytics queda explícitamente fuera del alcance (RN-289). Se agregan `VALIDATION_038` (plazo fuera de rango), `VALIDATION_039` (mes de liquidación fuera del plan), `BIZ_034` (la cuenta no es una tarjeta de crédito propia y activa) y `BIZ_035` (plan inexistente o ajeno). Se actualiza el índice hasta CU-077 / RN-289 / VALIDATION_039 / BIZ_035, la tabla de Relaciones y el diagrama ER (`MSI_PAYMENTS`).|CU-072 a CU-077|[[transacciones]] (tipo nuevo, CU-017 lo excluye de la edición desde el listado), [[presupuesto]] (grupo nuevo, RN-075 revisada), [[cuentas]] (detalle de tarjeta)|
 |2026-09-04|msi|Registro del diseño descartado, por su valor como precedente: la primera versión (migraciones `20260903100000` y `20260903110000`, aplicadas en producción) modelaba una compra a meses como un `gasto` con `msi_meses` encima —es decir, con categoría— y agregaba `budgets.msi_transaction_id` como cuarta opción excluyente. Se sustituyó al constatar que obligaba a excluir esas compras en cada agregación de gasto (diez hooks) y que bastaba olvidarlo en una para tener dos pantallas contradiciéndose. La migración `20260904130000_msi_module.sql` retira esa columna, devuelve `budgets` a su constraint de tres vías y restaura `save_budgets`/`copy_budget_month` a su versión previa. `budgets` queda exactamente como antes de MSI.|CU-072|[[presupuesto]] (sin cambios netos en el esquema de `budgets`)|
 |2026-09-05|ahorros-y-metas, creditos-deudas|Ajustes sobre módulos ya construidos, **sin cambios de esquema** — ninguna colección, índice o relación se modifica. Se agregan RN-290 a RN-293. Las cards de meta y de deuda pasan a mostrar su fecha (`fecha_limite` / `fecha_liquidacion_estimada`) como pill en el renglón de cierre en lugar del tiempo restante, con altura mínima fija en ese renglón (RN-290, RN-293): la pill en un renglón propio desigualaba la altura de las cards dentro de una fila del grid. El detalle de una meta con fecha límite gana el bloque de ritmo de ahorro (RN-291, RN-292): `monto_restante` entre los días que faltan, y ese diario por 7 y por 30 — calculado en tiempo de consulta, sin persistir nada, y sin relación con transacciones ni [[presupuesto]]. Se revisa RN-129 de [[ahorros-y-metas]] en consecuencia.|CU-043, CU-044, CU-056|[[ahorros-y-metas]] (RN-290 a RN-292, RN-129 revisada), [[creditos-deudas]] (RN-293)|
+|2026-09-05|suscripciones|Se crea el módulo Suscripciones, construido primero en código y documentado después (segundo caso tras [[msi]]) y primero que **no** formaba parte del alcance: revierte la decisión de dejarlo fuera para siempre, registrada en `CLAUDE.md` hasta el 2026-09-04. Se agrega la tabla `subscriptions` y con ella CU-078 a CU-082 y RN-294 a RN-320. Es la tabla más aislada del registro: **ninguna llave foránea fuera de `users`**, catálogo de categorías propio en vez de `categories` (RN-295) y método de pago como texto en vez de una FK a `accounts` (RN-300) — un cobro de suscripción no genera transacción, no consume presupuesto y no aparece en Analytics (RN-311). Es también el primer módulo **sin funciones RPC**: no hay saldo que mover, así que insert/update directos bajo RLS bastan. Las fechas de cobro no se almacenan: se derivan de `fecha_inicio` y `ciclo` en el cliente, anclando cada ocurrencia al inicio para que el recorte de fin de mes no se arrastre (RN-302, RN-303). Archivar sella `archivada_en` y corta las ocurrencias ahí, conservando el pasado (RN-312) — sin esa fecha, archivar habría borrado retroactivamente gasto real de las gráficas. Se agregan `VALIDATION_040` (nombre duplicado), `VALIDATION_041` (fecha de fin anterior al inicio) y `BIZ_036` (suscripción inexistente o ajena). Se actualiza el índice hasta CU-082 / RN-320 / VALIDATION_041 / BIZ_036, la tabla de Relaciones y el diagrama ER (`SUBSCRIPTIONS`).|CU-078 a CU-082|Ninguno — el módulo no modifica ninguna tabla ni documento existente|
 
 ---
 
-Documentos relacionados: [[estrategia]] · [[brief-ux]] · [[roadmap]] · [[backlog]] · [[auth]] · [[ahorros-y-metas]] · [[inversiones]] · [[creditos-deudas]] · [[dashboard]] · [[msi]]
+Documentos relacionados: [[estrategia]] · [[brief-ux]] · [[roadmap]] · [[backlog]] · [[auth]] · [[ahorros-y-metas]] · [[inversiones]] · [[creditos-deudas]] · [[dashboard]] · [[msi]] · [[suscripciones]]

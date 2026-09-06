@@ -50,6 +50,7 @@ Roadmap completo → [[roadmap]]
 - [[inversiones]] — instrumentos y balance capturado
 - [[creditos-deudas]] — deuda externa (auto, hipoteca, personal)
 - [[msi]] — compras a meses sin intereses
+- [[suscripciones]] — rastreador de servicios recurrentes, aislado del resto de la app
 - [[dashboard]] — Balance, Networth y Analytics
 - [[reportes]] — **registro histórico**: sucedido por [[dashboard]], nunca se construyó en su forma
   original. Sus CU y RN no se reutilizan.
