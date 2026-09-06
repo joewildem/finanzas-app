@@ -357,9 +357,9 @@ ayudar al usuario a decidir si ya exentó la comisión o si aún necesita gastar
 5. Para cada tarjeta con `gasto_minimo_mensual` configurado, el sistema calcula el ciclo de corte
    actual a partir de `dia_corte` y el gasto acumulado dentro de ese ciclo, comparándolo contra el
    mínimo.
-6. El sistema muestra las cards (imagen configurada, nombre, balance, barra de utilización de línea
-   de crédito, % y disponible, y el indicador de avance de gasto mínimo si aplica) — 4 o 5 visibles,
-   resto en carrusel.
+6. El sistema muestra las cards (imagen configurada, nombre y balance centrados, el chip de avance
+   de gasto mínimo junto al balance si aplica, y al pie la barra de utilización de línea de crédito
+   con su % y disponible) — 4 o 5 visibles, resto en carrusel.
 
 **Flujos alternativos / casos borde**
 
@@ -399,9 +399,18 @@ _No aplica — este CU no captura datos, solo consulta información existente._
   calendario en vez de ciclo de corte.
 - RN-237: El gasto del ciclo de una tarjeta es la suma, en valor absoluto, de los montos de
   `transactions` con `tipo = gasto` de esa cuenta dentro del ciclo resuelto por RN-236; se compara
-  contra `gasto_minimo_mensual` para mostrar el avance. Si `gasto_minimo_mensual` es `0` o no está
-  configurado, no se muestra el indicador. Si el gasto excede el mínimo, se muestra al 100% sin
-  sobrepasar visualmente. **Corrige RN-084 de [[reportes]]** en el mismo sentido que RN-236.
+  contra `gasto_minimo_mensual` y ambas cifras se muestran juntas en un chip al lado del saldo. Si
+  `gasto_minimo_mensual` es `0` o no está configurado, el chip no aparece y la card conserva la
+  misma estructura, que es la razón de que este dato sea un chip y no una segunda barra de progreso:
+  solo algunas tarjetas tienen mínimo, y colgar de él un bloque entero hacía que unas cards se
+  estructuraran distinto de otras dentro de la misma cuadrícula.
+  **Corrige RN-084 de [[reportes]]** en el mismo sentido que RN-236.
+- RN-331: Las cards de cuenta de débito/efectivo (CU-061) y las de tarjeta de crédito (CU-063)
+  comparten estructura: nombre y saldo juntos en el centro, y un solo renglón anclado al pie. Lo que
+  cambia es qué ocupa ese renglón — el tipo de cuenta en las primeras, la barra de utilización en las
+  segundas, donde el tipo no aporta nada porque siempre es `credito`. Antes las de débito separaban
+  el nombre del saldo en extremos opuestos de la card, lo que obligaba a leerla de arriba abajo para
+  armar un dato que es uno solo: de qué cuenta y cuánto tiene.
 - RN-241: Encima de las cards, se muestra "Total credit cards" = suma de `saldo_actual` de todas las
   cuentas `tipo = credito` activas — mismo patrón que el balance total de RN-225, sin concepto de
   exclusión (`excluir_de_stats` no aplica al total de crédito, a diferencia de débito/efectivo).
@@ -1601,6 +1610,7 @@ No introduce colección nueva — consulta agregada sobre `transactions` y `cate
 
 | Fecha | Cambio | CU afectado | Impacto en otros documentos |
 |---|---|---|---|
+| 2026-09-06 | Ajuste visual de las cards de cuenta, sin cambios de esquema ni de cálculo (RN-331, RN-237 revisada). Las cards de débito/efectivo pasan a agrupar nombre y saldo en el centro —como ya hacían las de crédito— dejando el tipo de cuenta solo al pie y alineado a la izquierda. En las de crédito se retira la segunda barra de progreso del gasto mínimo y ese dato pasa a un chip junto al saldo, de modo que la card se estructure igual tenga o no `gasto_minimo_mensual` configurado. | CU-061, CU-063 | Se actualiza [[data-model-registry]]: índice de numeración hasta RN-331 |
 | 2026-08-26 | Se documenta la pestaña Balance del módulo Dashboard: balance total + cards de cuentas débito/efectivo (imagen, orden, carrusel), evolución mensual de balance (año navegable limitado a años con datos), resumen de tarjetas de crédito (utilización, disponible, orden, carrusel) con el indicador de gasto mínimo recalculado por ciclo de corte en vez de mes calendario, y evolución mensual de gasto por tarjeta. Se agregan CU-061 a CU-064, RN-225 a RN-241 (incluye RN-241, total de tarjetas de crédito, agregada durante la construcción en código). No se crean colecciones ni campos nuevos — agregación en tiempo de consulta sobre `accounts` y `transactions`, reutilizando `accounts.dia_corte` (ya existente desde [[cuentas]]) para el cálculo del ciclo de corte. Networth y Analytics quedan pendientes de documentar. Aprovechando esta revisión, se detectó y corrige una inconsistencia de formato en toda la plataforma (no específica de este módulo): montos siempre a 2 decimales, porcentajes a 1 decimal salvo que sea `.0`, en cuyo caso se muestra sin decimales — ver commit correspondiente. | CU-061, CU-062, CU-063, CU-064 | Se actualiza [[data-model-registry]] con el índice de numeración (hasta CU-064 / RN-240) y una nota de sucesión funcional sobre [[reportes]] — sin nuevas colecciones que registrar. |
 | 2026-08-26 | Se documenta la pestaña Networth del módulo Dashboard — territorio nuevo, no sucede a ningún CU de [[reportes]]. Se agregan CU-065 a CU-068: desglose de Cash & Savings/Investments/Liabilities, histórico de Networth total con selector de periodo, comparativo Assets vs Liabilities, y meta de Networth configurable. Se introduce la tabla `networth_goals`. Analytics queda pendiente. | CU-065, CU-066, CU-067, CU-068 | Se actualiza [[data-model-registry]] con el índice de numeración (hasta CU-068 / RN-256 / VALIDATION_037), la tabla `networth_goals`, sus relaciones y el diagrama ER — ver el detalle completo en el historial de [[data-model-registry]]. |
 | 2026-08-28 | Se documenta la pestaña Analytics del módulo Dashboard, la última del alcance completo: cuatro cards de resumen (Income, Expenses, Savings, Investment) con comparativo contra el periodo anterior equivalente, gráfica de Cash Flow (Income vs Expenses, granularidad siempre mensual) y una card de barras horizontales por cada grupo de categorías del usuario. Se agregan CU-069 a CU-071, RN-257 a RN-269. **Cambio previo, disparado por esta pestaña:** `categories.flujo` gana un tercer valor estructural, `investment` (antes un subconjunto de Outflow distinguido por nombre exacto) — ver changelog de [[categorias]] del mismo día. Con esto, Expenses e Investment nunca se traslapan sin depender de un nombre de grupo. Suceden funcionalmente a CU-027, CU-028 y CU-030 de [[reportes]] (resumen por grupo, distribución de gasto por categoría, ingresos vs. gastos) — CU-031 (frecuencia de transacciones) no se retoma, queda en [[backlog]]. Los números `CU-023`–`CU-031`/`RN-076`–`RN-097` de [[reportes]] no se reutilizan ni se renumeran. No se crean colecciones nuevas — 100% agregación en tiempo de consulta sobre `transactions`, `categories` y `savings_goals`. Con esta pestaña se completa la construcción en código de todo el alcance definido del producto. | CU-069, CU-070, CU-071 | Se actualiza [[data-model-registry]] con el índice de numeración (hasta CU-071 / RN-269) y la nota de sucesión final sobre [[reportes]]. |

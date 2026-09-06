@@ -5,11 +5,15 @@ import { ACCOUNT_IMAGE_ASPECT_CLASS, computeAvailableCredit, formatCurrency, typ
 import { formatPercent } from '@/lib/utils'
 
 // CU-063 — mismo shell visual que AccountCardTile (imagen de fondo o degradado por color, scrim
-// para legibilidad), pero con contenido propio de tarjeta de crédito: barra de utilización de línea
-// de crédito (RN-234) y, si `gasto_minimo_mensual` está configurado, una segunda barra con el
-// avance de gasto del ciclo de corte en curso (RN-236/RN-237) — ambas ancladas abajo en vez del
-// renglón "tipo" que usa AccountCardTile, porque aquí no aplica (siempre es `credito`). Enlaza al
-// detalle de cuenta del Dashboard, igual que AccountCardTile.
+// para legibilidad) y misma estructura de contenido: nombre y saldo centrados, un renglón anclado
+// abajo. Lo propio de una tarjeta de crédito es qué ocupa ese renglón: la barra de utilización de
+// línea (RN-234) en vez del tipo de cuenta, que aquí no aporta nada porque siempre es `credito`.
+//
+// El avance de gasto del ciclo (RN-236/RN-237) vive como chip junto al saldo y no como una segunda
+// barra: solo algunas tarjetas tienen `gasto_minimo_mensual`, y colgar de él un bloque entero hacía
+// que unas cards se estructuraran distinto de otras dentro de la misma cuadrícula.
+//
+// Enlaza al detalle de cuenta del Dashboard, igual que AccountCardTile.
 export function CreditBalanceCard({ account, cycleSpend }: { account: Account; cycleSpend?: CycleSpend }) {
   const hasImage = Boolean(account.imagen_url)
   const lineaCredito = account.linea_credito ?? 0
@@ -18,7 +22,6 @@ export function CreditBalanceCard({ account, cycleSpend }: { account: Account; c
 
   const gastoMinimo = account.gasto_minimo_mensual ?? 0
   const showCycle = gastoMinimo > 0 && cycleSpend !== undefined
-  const porcentajeAvanceMinimo = showCycle ? Math.min(cycleSpend!.gasto_ciclo_actual / gastoMinimo, 1) : 0
 
   return (
     <Link
@@ -43,36 +46,31 @@ export function CreditBalanceCard({ account, cycleSpend }: { account: Account; c
       <div className="relative flex h-full flex-col p-4">
         <div className="flex flex-1 flex-col justify-center gap-1.5">
           <p className="truncate text-sm font-medium text-white/80">{account.nombre}</p>
-          <p className="font-mono text-2xl font-medium text-white">{formatCurrency(account.saldo_actual)}</p>
+          {/* El avance del ciclo es un chip junto al saldo y ya no una segunda barra: así la card
+              mide y se estructura igual tenga o no `gasto_minimo_mensual` configurado, en vez de
+              crecer un bloque entero solo para las tarjetas que lo tienen. `flex-wrap` es la válvula
+              de escape cuando el saldo es largo y no caben los dos en el renglón. */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className="font-mono text-2xl font-medium text-white">{formatCurrency(account.saldo_actual)}</p>
+            {showCycle && (
+              <span className="shrink-0 rounded-full bg-white/15 px-2 py-0.5 text-[10px] text-white/80">
+                Cycle: {formatCurrency(cycleSpend!.gasto_ciclo_actual)} / {formatCurrency(gastoMinimo)}
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
-              <div
-                className="h-full rounded-full bg-destructive"
-                style={{ width: `${Math.min(porcentajeUtilizado, 1) * 100}%` }}
-              />
-            </div>
-            <div className="mt-1 flex items-center justify-between text-[10px] text-white/70">
-              <span>{formatPercent(porcentajeUtilizado * 100)} used</span>
-              <span>{formatCurrency(disponible)} available</span>
-            </div>
+        <div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
+            <div
+              className="h-full rounded-full bg-destructive"
+              style={{ width: `${Math.min(porcentajeUtilizado, 1) * 100}%` }}
+            />
           </div>
-
-          {showCycle && (
-            <div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
-                <div
-                  className="h-full rounded-full bg-success"
-                  style={{ width: `${porcentajeAvanceMinimo * 100}%` }}
-                />
-              </div>
-              <p className="mt-1 text-[10px] text-white/70">
-                {formatCurrency(cycleSpend!.gasto_ciclo_actual)} of {formatCurrency(gastoMinimo)} this cycle
-              </p>
-            </div>
-          )}
+          <div className="mt-1 flex items-center justify-between text-[10px] text-white/70">
+            <span>{formatPercent(porcentajeUtilizado * 100)} used</span>
+            <span>{formatCurrency(disponible)} available</span>
+          </div>
         </div>
       </div>
     </Link>
