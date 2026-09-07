@@ -31,8 +31,12 @@ function AppShellHeader() {
     navigate('/login', { replace: true })
   }
 
+  // El header queda fijo arriba al hacer scroll. `bg-background` explícito porque el contenido
+  // pasa por debajo y sin fondo propio se vería a través; `z-40` es el mismo nivel que BottomNav y
+  // el FAB, por debajo de los overlays (diálogos, dropdowns y popovers usan `z-50`), que deben
+  // seguir tapándolo.
   return (
-    <header className="border-b border-border">
+    <header className="sticky top-0 z-40 border-b border-border bg-background">
       <div className="relative mx-auto flex h-14 w-full max-w-[1600px] items-center px-6 sm:px-10 lg:px-14">
         {/* Mobile (<md): logo centrado respecto al ancho total del header (position absolute +
             translate). Desktop (md+): se cancela ese centrado y queda como bloque normal alineado
