@@ -7,6 +7,7 @@ import {
   groupDebtBalancesByType,
   type NetworthBreakdownGroup,
 } from '@/lib/networth'
+import { useDataVersion } from '@/hooks/use-data-version'
 import { supabase } from '@/lib/supabase'
 import type { Account } from '@/lib/accounts'
 import { computeMontoAportadoActual, type SavingsGoal } from '@/lib/savings-goals'
@@ -94,9 +95,12 @@ export function useNetworthBreakdown() {
     })
   }, [])
 
+  // Vuelve a consultar cuando cualquier parte de la app escribe en Supabase, para que el
+  // Dashboard no quede desactualizado hasta recargar la página — ver `src/lib/data-refresh.ts`.
+  const dataVersion = useDataVersion()
   useEffect(() => {
     refetch()
-  }, [refetch])
+  }, [refetch, dataVersion])
 
   return { breakdown, error, refetch }
 }

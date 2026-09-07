@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import { useDataVersion } from '@/hooks/use-data-version'
 import { useAuthSession } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
 
@@ -26,9 +27,12 @@ export function useNetworthGoal() {
     setGoal(data as NetworthGoal | null)
   }, [])
 
+  // Vuelve a consultar cuando cualquier parte de la app escribe en Supabase, para que el
+  // Dashboard no quede desactualizado hasta recargar la página — ver `src/lib/data-refresh.ts`.
+  const dataVersion = useDataVersion()
   useEffect(() => {
     refetch()
-  }, [refetch])
+  }, [refetch, dataVersion])
 
   const save = useCallback(
     async (montoObjetivo: number) => {

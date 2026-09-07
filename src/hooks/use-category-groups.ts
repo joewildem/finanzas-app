@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import { useDataVersion } from '@/hooks/use-data-version'
 import { supabase } from '@/lib/supabase'
 import type { Category, CategoryGroup } from '@/lib/categories'
 
@@ -43,9 +44,12 @@ export function useCategoryGroups(includeArchived: boolean) {
     )
   }, [includeArchived])
 
+  // Alimenta las tres cards de Analytics del Dashboard: si el catálogo cambia, esas cards deben
+  // reagruparse sin recargar la página — ver `src/lib/data-refresh.ts`.
+  const dataVersion = useDataVersion()
   useEffect(() => {
     refetch()
-  }, [refetch])
+  }, [refetch, dataVersion])
 
   return { groups, error, refetch }
 }

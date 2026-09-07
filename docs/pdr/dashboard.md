@@ -16,6 +16,18 @@ sin construirse en su forma original, y su función se absorbe aquí (ver la not
 tres pestañas se documentan y construyen una por una, alineando primero con el usuario en lenguaje
 no técnico antes de formalizar cada una — este documento crece con cada pestaña cerrada.
 
+- RN-332: Las tres pestañas reflejan cualquier escritura de datos sin recargar la página. Como todo
+  el módulo es agregación en tiempo de consulta, una transacción registrada desde cualquier punto de
+  la aplicación —el botón global "Add record", el listado de Transacciones, un pago de deuda, una
+  aportación a meta, una compra a meses, un ajuste de saldo— invalida lo que el Dashboard tiene en
+  pantalla. La señal de invalidación se emite en el cliente de Supabase, no en cada punto de
+  escritura: se marcan como "datos cambiaron" las peticiones a `/rest/v1/` que no son de lectura,
+  lo que cubre los RPC del sistema (todos son de escritura) y todo insert/update/delete, y deja
+  fuera `/auth/v1/`. Es deliberado que el aviso no viva en cada diálogo: hay del orden de 35 puntos
+  de escritura repartidos en la aplicación, y uno que olvidara avisar reintroduciría el problema en
+  silencio. Las lecturas viajan en `GET` y por eso nunca emiten la señal — un refetch no puede
+  encadenar otro.
+
 **Balance** informa sobre el dinero disponible: balance total y cards de cuentas de débito/efectivo,
 su evolución mensual, y el resumen de tarjetas de crédito (utilización, disponible, y avance de
 gasto contra el mínimo mensual por ciclo de corte) junto con su evolución de gasto mensual.
@@ -1613,6 +1625,7 @@ No introduce colección nueva — consulta agregada sobre `transactions` y `cate
 
 | Fecha | Cambio | CU afectado | Impacto en otros documentos |
 |---|---|---|---|
+| 2026-09-07 | Corrección de comportamiento detectada en uso real: el Dashboard mostraba cifras viejas hasta recargar la página cuando el usuario registraba un movimiento desde otra parte de la aplicación (RN-332). Ninguna de las tres pestañas se suscribía a cambios —a diferencia de Transacciones, Presupuesto, Ahorros y Deudas, que sí lo hacían, aunque solo para el alta desde el botón global y no para ediciones, borrados ni el resto de las escrituras—. Se agrega una señal global de invalidación emitida desde el cliente de Supabase (`src/lib/data-refresh.ts`), a la que se suscriben los hooks de lectura de las tres pestañas. **Sin cambios de esquema ni de cálculo.** | CU-061 a CU-071 | Se actualiza [[data-model-registry]]: índice de numeración hasta RN-332 |
 | 2026-09-06 | Ajuste visual de las cards de cuenta, sin cambios de esquema ni de cálculo (RN-331, RN-237 revisada). Las cards de débito/efectivo pasan a agrupar nombre y saldo en el centro —como ya hacían las de crédito— dejando el tipo de cuenta solo al pie y alineado a la izquierda. El indicador de gasto mínimo del ciclo se **retira de la card**: se probó como segunda barra y luego como chip junto al saldo, y en ambos casos competía con el dato principal. Su cálculo queda intacto y su presentación pendiente de decidir (RN-237); nada de la regla se retira. | CU-061, CU-063 | Se actualiza [[data-model-registry]]: índice de numeración hasta RN-331 |
 | 2026-08-26 | Se documenta la pestaña Balance del módulo Dashboard: balance total + cards de cuentas débito/efectivo (imagen, orden, carrusel), evolución mensual de balance (año navegable limitado a años con datos), resumen de tarjetas de crédito (utilización, disponible, orden, carrusel) con el indicador de gasto mínimo recalculado por ciclo de corte en vez de mes calendario, y evolución mensual de gasto por tarjeta. Se agregan CU-061 a CU-064, RN-225 a RN-241 (incluye RN-241, total de tarjetas de crédito, agregada durante la construcción en código). No se crean colecciones ni campos nuevos — agregación en tiempo de consulta sobre `accounts` y `transactions`, reutilizando `accounts.dia_corte` (ya existente desde [[cuentas]]) para el cálculo del ciclo de corte. Networth y Analytics quedan pendientes de documentar. Aprovechando esta revisión, se detectó y corrige una inconsistencia de formato en toda la plataforma (no específica de este módulo): montos siempre a 2 decimales, porcentajes a 1 decimal salvo que sea `.0`, en cuyo caso se muestra sin decimales — ver commit correspondiente. | CU-061, CU-062, CU-063, CU-064 | Se actualiza [[data-model-registry]] con el índice de numeración (hasta CU-064 / RN-240) y una nota de sucesión funcional sobre [[reportes]] — sin nuevas colecciones que registrar. |
 | 2026-08-26 | Se documenta la pestaña Networth del módulo Dashboard — territorio nuevo, no sucede a ningún CU de [[reportes]]. Se agregan CU-065 a CU-068: desglose de Cash & Savings/Investments/Liabilities, histórico de Networth total con selector de periodo, comparativo Assets vs Liabilities, y meta de Networth configurable. Se introduce la tabla `networth_goals`. Analytics queda pendiente. | CU-065, CU-066, CU-067, CU-068 | Se actualiza [[data-model-registry]] con el índice de numeración (hasta CU-068 / RN-256 / VALIDATION_037), la tabla `networth_goals`, sus relaciones y el diagrama ER — ver el detalle completo en el historial de [[data-model-registry]]. |

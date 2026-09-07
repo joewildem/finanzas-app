@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import { useDataVersion } from '@/hooks/use-data-version'
 import { supabase } from '@/lib/supabase'
 import type { Account } from '@/lib/accounts'
 
@@ -23,9 +24,12 @@ export function useAccounts(includeArchived: boolean) {
     setAccounts(data as Account[])
   }, [includeArchived])
 
+  // Vuelve a consultar cuando cualquier parte de la app escribe en Supabase, para que el
+  // Dashboard no quede desactualizado hasta recargar la página — ver `src/lib/data-refresh.ts`.
+  const dataVersion = useDataVersion()
   useEffect(() => {
     refetch()
-  }, [refetch])
+  }, [refetch, dataVersion])
 
   return { accounts, error, refetch }
 }

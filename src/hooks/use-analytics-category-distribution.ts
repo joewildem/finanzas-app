@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { useCategoryGroups } from '@/hooks/use-category-groups'
+import { useDataVersion } from '@/hooks/use-data-version'
 import type { CategoryFlow } from '@/lib/categories'
 import { computeCurrentPeriodRange, type Period } from '@/lib/date-periods'
 import { supabase } from '@/lib/supabase'
@@ -79,9 +80,12 @@ export function useAnalyticsCategoryDistribution(periodo: Period, customRange?: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groups, periodo, fechaInicioKey, fechaFinKey])
 
+  // Vuelve a consultar cuando cualquier parte de la app escribe en Supabase, para que el
+  // Dashboard no quede desactualizado hasta recargar la página — ver `src/lib/data-refresh.ts`.
+  const dataVersion = useDataVersion()
   useEffect(() => {
     refetch()
-  }, [refetch])
+  }, [refetch, dataVersion])
 
   return { distribucion, error, refetch }
 }

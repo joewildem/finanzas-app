@@ -9,6 +9,7 @@ import {
   computeNetworthMonths,
   type NetworthPeriod,
 } from '@/lib/networth'
+import { useDataVersion } from '@/hooks/use-data-version'
 import { supabase } from '@/lib/supabase'
 import type { Account } from '@/lib/accounts'
 import type { SavingsGoal } from '@/lib/savings-goals'
@@ -143,9 +144,12 @@ export function useNetworthHistory(periodo: NetworthPeriod, customRange?: { fech
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodo, fechaInicioKey, fechaFinKey])
 
+  // Vuelve a consultar cuando cualquier parte de la app escribe en Supabase, para que el
+  // Dashboard no quede desactualizado hasta recargar la página — ver `src/lib/data-refresh.ts`.
+  const dataVersion = useDataVersion()
   useEffect(() => {
     refetch()
-  }, [refetch])
+  }, [refetch, dataVersion])
 
   return { meses, earliestDate, error, refetch }
 }

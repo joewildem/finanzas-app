@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
+import { withDataRefreshTracking } from '@/lib/data-refresh'
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 
@@ -15,5 +17,10 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
     // poder capturar un rechazo del Custom Access Token Hook y mostrarlo) — el auto-detect del
     // SDK lo haría en silencio y se perdería el error real (RN-098/102).
     detectSessionInUrl: false,
+  },
+  global: {
+    // Toda escritura pasa por aquí y emite la señal de datos actualizados, para que las pantallas
+    // ya montadas no se queden mostrando cifras viejas — ver `src/lib/data-refresh.ts`.
+    fetch: withDataRefreshTracking(fetch),
   },
 })

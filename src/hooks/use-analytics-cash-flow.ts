@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { endOfMonth, parse, startOfMonth } from 'date-fns'
 
 import { useCategoryGroups } from '@/hooks/use-category-groups'
+import { useDataVersion } from '@/hooks/use-data-version'
 import { computePeriodMonths, type Period } from '@/lib/date-periods'
 import { supabase } from '@/lib/supabase'
 
@@ -78,9 +79,12 @@ export function useAnalyticsCashFlow(periodo: Period, customRange?: { fechaInici
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groups, periodo, fechaInicioKey, fechaFinKey])
 
+  // Vuelve a consultar cuando cualquier parte de la app escribe en Supabase, para que el
+  // Dashboard no quede desactualizado hasta recargar la página — ver `src/lib/data-refresh.ts`.
+  const dataVersion = useDataVersion()
   useEffect(() => {
     refetch()
-  }, [refetch])
+  }, [refetch, dataVersion])
 
   return { meses, error, refetch }
 }

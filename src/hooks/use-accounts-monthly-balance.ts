@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { endOfMonth, isAfter, parse } from 'date-fns'
 
+import { useDataVersion } from '@/hooks/use-data-version'
 import type { Account } from '@/lib/accounts'
 import { supabase } from '@/lib/supabase'
 
@@ -103,9 +104,12 @@ export function useAccountsMonthlyBalance(anio: number) {
     setMeses(points)
   }, [anio])
 
+  // Vuelve a consultar cuando cualquier parte de la app escribe en Supabase, para que el
+  // Dashboard no quede desactualizado hasta recargar la página — ver `src/lib/data-refresh.ts`.
+  const dataVersion = useDataVersion()
   useEffect(() => {
     refetch()
-  }, [refetch])
+  }, [refetch, dataVersion])
 
   return { meses, error, refetch }
 }
