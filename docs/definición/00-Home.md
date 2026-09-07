@@ -3,7 +3,7 @@ status: en progreso
 last-updated: 2026-09-04
 ---
 
-# 🏦 Finanzas App — Home
+# 🏦 Fincap — Home
 
 Vault de documentación del proyecto. Empieza siempre aquí.
 

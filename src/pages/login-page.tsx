@@ -58,7 +58,7 @@ export function LoginPage() {
           <div className="flex size-6 items-center justify-center rounded-lg bg-brand">
             <HugeiconsIcon icon={GalleryVerticalEndIcon} className="size-4 text-brand-foreground" />
           </div>
-          <span className="text-sm font-medium text-foreground">Finanzas App</span>
+          <span className="text-sm font-medium text-foreground">Fincap</span>
         </div>
 
         <Card className="w-full">

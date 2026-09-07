@@ -1,4 +1,4 @@
-# Finanzas App
+# Fincap
 
 App de finanzas personales — MVP cerrado para un grupo reducido de usuarios (<5), con web app y app híbrida (iOS/Android).
 

@@ -9,7 +9,7 @@ Figma. Se basa en [[definición-del-producto]] y [[estrategia]].
 ## Arquitectura de información (navegación principal, MVP)
 
 ```
-Finanzas app
+Fincap
 ├── Dashboard            (vista rápida: saldo total, gasto del mes, avance de presupuesto)
 ├── Cuentas               (lista, detalle, alta/edición, imagen de tarjeta)
 ├── Gastos & Presupuesto  (registro de gasto, historial, presupuesto mensual por categoría)

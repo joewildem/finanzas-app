@@ -2,7 +2,7 @@ Usar este prompt (ajustando lo que está entre corchetes) para abrir el chat de 
 
 ---
 
-Retomamos el proyecto Finanzas App — módulo [nombre del módulo] ([fase del roadmap]).
+Retomamos el proyecto Fincap — módulo [nombre del módulo] ([fase del roadmap]).
 
 En Project Knowledge están: [lista de archivos vigentes en Project Knowledge].
 

@@ -1,10 +1,10 @@
-# Finanzas App — Contexto para Claude Code
+# Fincap — Contexto para Claude Code
 
 Este archivo da contexto persistente a Claude Code en cada sesión dentro de este repositorio. Léelo antes de cualquier tarea de documentación o desarrollo.
 
 ## Qué es este proyecto
 
-Finanzas App: app de finanzas personales para un grupo cerrado (menos de 5 usuarios), web + app híbrida (iOS/Android). Ver `docs/discovery/definición-del-producto.md` para el detalle completo.
+Fincap (antes "Finanzas App"): app de finanzas personales para un grupo cerrado (menos de 5 usuarios), web + app híbrida (iOS/Android). Ver `docs/discovery/definición-del-producto.md` para el detalle completo.
 
 ## Punto de entrada a la documentación
 

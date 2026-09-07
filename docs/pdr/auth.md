@@ -7,7 +7,7 @@ status: cerrado
 
 ## Resumen del módulo
 
-Este módulo cubre el ingreso al sistema para el grupo cerrado de usuarios de Finanzas App, mediante
+Este módulo cubre el ingreso al sistema para el grupo cerrado de usuarios de Fincap, mediante
 autenticación con Google (sin contraseña propia ni flujo de registro público). Formaliza además la
 colección `users`, referenciada desde el primer módulo (`user_id` en `accounts`, `categories`,
 `transactions` y `budgets`) pero nunca antes documentada, y el mecanismo real detrás de `AUTH_001`

@@ -7,7 +7,7 @@ last-updated: 2026-07-24
 
 ## Resumen
 
-Finanzas App es una aplicación de gestión financiera personal diseñada para un grupo cerrado de
+Fincap es una aplicación de gestión financiera personal diseñada para un grupo cerrado de
 hasta cinco usuarios. El producto centraliza el seguimiento de cuentas, presupuesto, ahorros,
 créditos e inversiones en un solo sistema, reemplazando una combinación de hojas de cálculo y
 aplicaciones financieras de propósito único.
@@ -27,7 +27,7 @@ Este enfoque presenta tres limitaciones:
 - **Datos fragmentados**: ninguna herramienta centraliza cuentas, ahorros, créditos e inversiones —
   los usuarios deben mantener registros manuales distribuidos en múltiples plataformas.
 
-Finanzas App resuelve estas limitaciones mediante una plataforma unificada y flexible, accesible
+Fincap resuelve estas limitaciones mediante una plataforma unificada y flexible, accesible
 desde web y móvil.
 
 ## Usuarios objetivo
