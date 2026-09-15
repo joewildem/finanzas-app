@@ -18,6 +18,12 @@ dist-ssr
 .env.*
 !.env.example
 
+# Respaldos del ambiente local (`supabase db dump --local`). Son datos de prueba sembrados a mano
+# que no viven en `supabase/seed.sql`, así que solo existen en el volumen de Docker — el respaldo es
+# el seguro contra perder ese volumen. No son código y no se versionan.
+local-data-backup.sql
+*-data-backup.sql
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
