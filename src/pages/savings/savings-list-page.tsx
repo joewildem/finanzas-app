@@ -29,10 +29,8 @@ export function SavingsListPage() {
 
   useEffect(() => {
     async function loadMovements() {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('meta_id, monto')
-        .in('tipo', ['aportacion_meta', 'retiro_meta'])
+      // RN-335: desde la vista y no desde `transactions`, para que la card incluya los ajustes de saldo.
+      const { data, error } = await supabase.from('savings_goal_movements').select('meta_id, monto')
 
       if (error) return
       const grouped: Record<string, Pick<Transaction, 'monto'>[]> = {}

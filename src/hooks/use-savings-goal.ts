@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { supabase } from '@/lib/supabase'
-import type { Transaction } from '@/lib/transactions'
-import type { SavingsGoal } from '@/lib/savings-goals'
-
-export interface GoalMovement extends Transaction {
-  account: { nombre: string; color: string } | null
-}
+import type { GoalMovement, SavingsGoal } from '@/lib/savings-goals'
 
 // CU-044 — detalle + historial de movimientos de una meta. Una meta inexistente o de otro usuario
 // simplemente no vuelve por RLS, mismo criterio "not found" sin código extra que `useAccount`.
+//
+// El historial sale de `savings_goal_movements` y no de `transactions` (RN-335): así incluye los
+// ajustes de saldo (CU-084), que no son transacciones porque no mueven ninguna cuenta. La vista ya
+// trae el nombre de la cuenta, `null` en los ajustes.
 export function useSavingsGoal(goalId: string | undefined) {
   const [goal, setGoal] = useState<SavingsGoal | null | undefined>(undefined)
   const [movements, setMovements] = useState<GoalMovement[]>([])
@@ -21,8 +20,8 @@ export function useSavingsGoal(goalId: string | undefined) {
     const [goalResult, movementsResult] = await Promise.all([
       supabase.from('savings_goals').select('*').eq('id', goalId).maybeSingle(),
       supabase
-        .from('transactions')
-        .select('*, account:accounts(nombre,color)')
+        .from('savings_goal_movements')
+        .select('*')
         .eq('meta_id', goalId)
         .order('fecha', { ascending: false }),
     ])

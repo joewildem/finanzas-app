@@ -17,9 +17,36 @@ export interface SavingsGoal {
 
 export const DEFAULT_GOAL_EMOJI = '💰'
 
+// RN-335 — todo lo que mueve el saldo de una meta, tal como lo expone la vista
+// `savings_goal_movements`: aportaciones y retiros (filas de `transactions`) y ajustes de saldo (filas
+// de `savings_goal_adjustments`, sin cuenta). Cualquier cálculo del saldo de una meta lee de esa vista
+// y no de `transactions`, o dejaría fuera los ajustes.
+export type GoalMovementOrigin = 'aportacion_meta' | 'retiro_meta' | 'ajuste_meta'
+
+export interface GoalMovement {
+  id: string
+  user_id: string
+  meta_id: string
+  origen: GoalMovementOrigin
+  account_id: string | null
+  account_nombre: string | null
+  // Convención de `transactions` (perspectiva de la cuenta): lo que entra a la meta es negativo.
+  monto: number
+  fecha: string
+  nota: string | null
+  created_at: string
+}
+
+export const GOAL_MOVEMENT_LABELS: Record<GoalMovementOrigin, string> = {
+  aportacion_meta: 'Goal contribution',
+  retiro_meta: 'Goal withdrawal',
+  ajuste_meta: 'Balance adjustment',
+}
+
 // RN-113 — calculado en tiempo de consulta, nunca persistido, mismo criterio que
 // `computeAvailableCredit` de cuentas. El signo de `monto` está definido desde la perspectiva de la
-// cuenta (aportación = negativo, retiro = positivo), por eso se resta en vez de sumar.
+// cuenta (aportación = negativo, retiro = positivo), por eso se resta en vez de sumar. Los ajustes de
+// saldo llegan con esa misma convención desde `savings_goal_movements` (RN-335).
 export function computeMontoAportadoActual(goal: SavingsGoal, movimientos: { monto: number }[]): number {
   const sumaConSigno = movimientos.reduce((sum, m) => sum + m.monto, 0)
   return goal.monto_inicial - sumaConSigno

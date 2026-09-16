@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { SearchRemoveIcon } from '@hugeicons/core-free-icons'
 import { useParams } from 'react-router-dom'
 
+import { AdjustGoalBalanceDialog } from '@/components/savings/adjust-goal-balance-dialog'
 import { ArchiveGoalDialog } from '@/components/savings/archive-goal-dialog'
 import { GoalProgressRing } from '@/components/savings/goal-progress-ring'
 import { SavingsGoalFormDialog } from '@/components/savings/savings-goal-form-dialog'
@@ -16,6 +17,7 @@ import { formatCurrency } from '@/lib/accounts'
 import { useAddTransaction } from '@/lib/add-transaction-context'
 import { formatDate } from '@/lib/dates'
 import {
+  GOAL_MOVEMENT_LABELS,
   computeMonthsRemaining,
   computeMontoAportadoActual,
   computeMontoRestante,
@@ -23,7 +25,6 @@ import {
   computeSavingsPace,
 } from '@/lib/savings-goals'
 import { supabase } from '@/lib/supabase'
-import { TRANSACTION_TYPE_LABELS } from '@/lib/transactions'
 import { formatPercent } from '@/lib/utils'
 
 // CU-044 — mismo layout que AccountDetailPage: header (emoji + nombre + badges + Edit/Archive),
@@ -98,6 +99,7 @@ export function SavingsGoalDetailPage() {
               <Button variant="outline" onClick={() => setWithdrawOpen(true)}>
                 Withdraw
               </Button>
+              <AdjustGoalBalanceDialog goalId={goal.id} currentAmount={aportado} onAdjusted={refetch} />
             </>
           )}
           <Button variant="outline" onClick={() => setEditOpen(true)}>
@@ -190,9 +192,14 @@ export function SavingsGoalDetailPage() {
               {movements.map((movement) => (
                 <div key={movement.id} className="flex items-center justify-between py-3">
                   <div>
-                    <p className="text-sm text-card-foreground">{TRANSACTION_TYPE_LABELS[movement.tipo]}</p>
+                    <p className="text-sm text-card-foreground">{GOAL_MOVEMENT_LABELS[movement.origen]}</p>
+                    {/* Un ajuste no tiene cuenta (CU-084): en su lugar se dice qué es, para que no se lea
+                        como una cuenta desconocida. */}
                     <p className="text-xs text-muted-foreground">
-                      {movement.account?.nombre ?? 'Unknown account'} · {formatDate(movement.fecha)}
+                      {movement.origen === 'ajuste_meta'
+                        ? 'Manual adjustment'
+                        : (movement.account_nombre ?? 'Unknown account')}{' '}
+                      · {formatDate(movement.fecha)}
                     </p>
                   </div>
                   <MovementAmount monto={movement.monto} />

@@ -49,7 +49,8 @@ export function useNetworthBreakdown() {
     const debts = debtsRes.data as Debt[]
 
     const [goalMovementsRes, debtPaymentsRes] = await Promise.all([
-      supabase.from('transactions').select('meta_id, monto').in('tipo', ['aportacion_meta', 'retiro_meta']),
+      // RN-335: el saldo de una meta incluye sus ajustes (rendimientos), que no viven en `transactions`.
+      supabase.from('savings_goal_movements').select('meta_id, monto'),
       supabase.from('transactions').select('deuda_id, monto_capital').eq('tipo', 'pago_deuda'),
     ])
     if (goalMovementsRes.error || debtPaymentsRes.error) {

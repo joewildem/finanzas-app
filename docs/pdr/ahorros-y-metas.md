@@ -232,7 +232,7 @@ Esta funcionalidad permitirá al usuario consultar todas sus metas de ahorro en 
 
 **Reglas de negocio**
 
-- RN-126: `monto_aportado_actual` se calcula en tiempo de consulta como `monto_inicial` menos la suma con signo de `monto` de todas las transacciones (`aportacion_meta`, `retiro_meta`) ligadas a esa meta mediante `meta_id` — nunca se persiste, mismo patrón que `saldo_actual`/`disponible` en otros módulos. La resta (en vez de suma) es porque el signo de `monto` está definido desde la perspectiva de la cuenta, no de la meta: una aportación resta de la cuenta (negativo) y por tanto suma a la meta; un retiro suma a la cuenta (positivo) y por tanto resta de la meta.
+- RN-126: `monto_aportado_actual` se calcula en tiempo de consulta como `monto_inicial` menos la suma con signo de `monto` de todas las transacciones (`aportacion_meta`, `retiro_meta`) ligadas a esa meta mediante `meta_id`, más los ajustes de saldo de la meta (_revisada 2026-09-16_, RN-335: el cálculo lee la vista `savings_goal_movements`, que reúne ambos) — nunca se persiste, mismo patrón que `saldo_actual`/`disponible` en otros módulos. La resta (en vez de suma) es porque el signo de `monto` está definido desde la perspectiva de la cuenta, no de la meta: una aportación resta de la cuenta (negativo) y por tanto suma a la meta; un retiro suma a la cuenta (positivo) y por tanto resta de la meta.
 - RN-127: `porcentaje_ahorrado = monto_aportado_actual / monto_objetivo`; no tiene tope superior — puede superar el 100% si el usuario sigue aportando después de alcanzar el objetivo.
 - RN-128: `monto_restante = monto_objetivo - monto_aportado_actual`; si el resultado es negativo (meta superada), se muestra como $0 en la card.
 - RN-129: si la meta no tiene `fecha_limite`, no se calcula ni se muestra tiempo restante en el detalle (CU-044), ni pill de fecha en la card (RN-290).
@@ -1073,6 +1073,154 @@ Reutiliza `(meta_id, fecha desc) WHERE meta_id IS NOT NULL` definido en CU-047.
 
 - Pantalla / flujo: [[wireframe-transacciones-alta]] (variante "Retirar de meta": selector de meta de origen + selector de cuenta destino)
 
+### CU-084 — Ajustar el saldo de una meta
+
+**Actor:** Usuario autenticado (dueño de los datos)
+
+**Descripción del caso de uso**
+
+Esta funcionalidad permite al usuario corregir el saldo de una meta capturando únicamente el saldo nuevo, sin registrar una aportación ni un retiro. Existe para las metas guardadas en instrumentos que generan rendimientos: el saldo real crece sin que el dinero salga de ninguna cuenta, así que no puede registrarse como aportación (CU-047), que exige una cuenta de origen. Es el equivalente para metas del ajuste de saldo de cuenta (CU-006 de [[cuentas]]).
+
+El ajuste no se registra en `transactions`: toda fila de esa tabla mueve exactamente una cuenta, y un ajuste de meta no mueve ninguna. Vive en su propia tabla, `savings_goal_adjustments`.
+
+**Flujo principal**
+
+1. El usuario abre el detalle de una meta activa (CU-044) y selecciona "Adjust balance".
+2. El sistema muestra el saldo actual de la meta y un campo con el saldo nuevo, precargado con el actual.
+3. El usuario captura el saldo nuevo. El sistema anticipa el efecto: cuánto se suma o se resta de la meta.
+4. El usuario confirma.
+5. El sistema calcula la diferencia contra el saldo actual con la meta bloqueada, y la registra en `savings_goal_adjustments`.
+6. El sistema muestra el ajuste en el historial de la meta como "Balance adjustment", con "Manual adjustment" en lugar del nombre de una cuenta.
+
+**Flujos alternativos / casos borde**
+
+- Si el saldo nuevo es igual al actual, no se registra nada; la interfaz deshabilita el guardado (RN-334).
+- Si el saldo nuevo es negativo, el sistema rechaza el ajuste (RN-334).
+- Si el saldo nuevo es cero, el ajuste se acepta — una meta puede quedar vacía.
+- Si la meta está archivada, el sistema rechaza el ajuste (RN-334).
+- Un ajuste equivocado no se edita ni se elimina: se corrige con otro ajuste (RN-334).
+- Un saldo que incluye rendimientos puede retirarse completo: la validación de retiros cuenta los ajustes (RN-335).
+
+**Precondiciones**
+
+- El usuario debe estar autenticado.
+- La meta debe existir, pertenecer al usuario y encontrarse en `status = active`.
+
+**Postcondiciones**
+
+- Si hubo diferencia, se crea un documento en `savings_goal_adjustments` con `monto` igual a la diferencia.
+- `monto_aportado_actual` de la meta queda igual al saldo capturado (RN-126, RN-335).
+- No cambia `saldo_actual` de ninguna cuenta, ni se crea ningún documento en `transactions`.
+
+**Definición detallada de campos**
+
+|Campo|Tipo de control|Obligatorio|Longitud|Formato / validación|Dependencias|Valor por defecto|Regla de negocio|
+|---|---|---|---|---|---|---|---|
+|`meta_id`|Implícito (detalle de la meta)|Sí|—|Debe referenciar una meta propia y activa|—|—|RN-334|
+|`nuevo_monto`|Numérico|Sí|—|Decimal mayor o igual a cero|—|Saldo actual de la meta|RN-333, RN-334|
+
+**Reglas de negocio**
+
+- RN-333: el ajuste de saldo de una meta captura únicamente el saldo nuevo; el sistema calcula la diferencia contra el saldo actual (RN-126) y la registra como un documento en `savings_goal_adjustments`. Nunca genera un documento en `transactions`, porque no mueve ninguna cuenta.
+- RN-334: `monto` se expresa desde la perspectiva de la meta: positivo si el saldo sube, negativo si baja. El saldo nuevo debe ser mayor o igual a cero; una diferencia de cero no genera registro; la meta debe estar activa. El ajuste se fecha al momento de registrarse y no lleva nota. No se edita ni se elimina — un error se corrige con otro ajuste, mismo criterio que el ajuste de cuenta (RN-015 de [[cuentas]]).
+- RN-335: la vista `savings_goal_movements` es la única definición de lo que mueve el saldo de una meta: aportaciones, retiros y ajustes, con `monto` en la convención de `transactions` (lo que entra a la meta es negativo). Todo cálculo del saldo lee de ella: el detalle (CU-044), el listado (CU-043), Networth actual e histórico (CU-065, CU-066 de [[dashboard]]) y la validación de retiros (RN-146), tanto al registrar (`create_goal_withdrawal`) como al editar (`update_transaction`). Sin esto, un rendimiento se vería en pantalla pero no podría retirarse.
+- RN-336: un ajuste no es una aportación. No participa en el "real" de la meta en Presupuesto (RN-151) ni en la card Savings de Analytics (CU-069 de [[dashboard]]), que leen `transactions` — un rendimiento no es dinero que el usuario haya asignado ni movido. La exclusión es estructural: no depende de un filtro en esas consultas.
+
+**Casos de uso derivados identificados**
+
+- Ninguno.
+
+**Validaciones**
+
+|Campo|Tipo|Reglas|Mitigación OWASP|
+|---|---|---|---|
+|`meta_id`|uuid|Requerido; debe existir, pertenecer al usuario y estar `status = active`|A01 — Control de acceso a nivel de objeto (IDOR)|
+|`nuevo_monto`|number|Requerido, decimal mayor o igual a cero|A03 — Validar tipo y rango numérico antes de persistir|
+
+**Mensajes de error**
+
+_Validación_
+
+- `VALIDATION_006`: "El monto no puede ser negativo." _(reutilizado)_
+
+_Autenticación / autorización_
+
+- `AUTH_001`: "Tu sesión ha expirado. Inicia sesión nuevamente." _(reutilizado)_
+
+_Lógica de negocio_
+
+- `BIZ_023`: "La meta seleccionada no existe, no te pertenece, o está archivada." _(reutilizado)_
+
+_Sistema_
+
+- `SYS_001`: "Ocurrió un error inesperado. Intenta de nuevo más tarde." _(reutilizado)_
+
+**Requerimientos técnicos backend**
+
+_Definición del servicio_
+
+|Método|Endpoint|Auth|
+|---|---|---|
+|POST|`/rest/v1/rpc/adjust_goal_balance`|Bearer JWT|
+
+_Request_
+
+```json
+{
+  "p_meta_id": "uuid (requerido)",
+  "p_nuevo_monto": "number (requerido, >= 0)"
+}
+```
+
+_Response (éxito)_
+
+```json
+{
+  "id": "uuid",
+  "meta_id": "uuid",
+  "monto": "number (diferencia, perspectiva de la meta)",
+  "fecha": "timestamptz"
+}
+```
+
+`null` cuando el saldo capturado es igual al actual.
+
+_Modelo de información_
+
+Tabla nueva `savings_goal_adjustments` y vista nueva `savings_goal_movements` — ver [[data-model-registry]].
+
+_Decisiones de modelado_
+
+- **Tabla propia y no un tipo nuevo en `transactions`.** Registrarlo como `transactions.tipo = ajuste_meta` obligaba a volver nullable `account_id`, hoy `not null`, del que dependen todos los RPC de transacciones, el listado de Transacciones, los historiales de cuenta y la reconstrucción de saldos. Con tabla propia, el ajuste queda fuera de todo eso por construcción — mismo razonamiento que dejó a las compras a meses sin categoría (ver [[msi]]).
+- **Vista para el saldo.** El costo de la tabla propia es que el saldo de una meta vive en dos lugares. La vista lo reúne en una sola definición que leen tanto las pantallas como los RPC, de modo que la interfaz y la validación de retiros no pueden discrepar sobre cuánto hay disponible. Usa `security_invoker`, así que el RLS de las tablas de origen aplica igual que en una lectura directa.
+- **Cascada hacia la meta.** Sin su meta un ajuste no significa nada y no hay cuenta que revertir; la cascada además permite que `clean_my_data` funcione sin conocer la tabla, mismo criterio que `msi_payments` y `subscription_payments`.
+
+_Índices_
+
+|Campos|Tipo|Propósito|
+|---|---|---|
+|`(meta_id, fecha desc)`|Índice|Historial y saldo de una meta|
+
+**Matriz de pruebas**
+
+|#|Categoría|Escenario|Input|Resultado esperado|
+|---|---|---|---|---|
+|1|Flujo exitoso|Saldo sube por rendimientos|Saldo 1000 → 1350.55|Ajuste de +350.55; saldo de la meta 1350.55|
+|2|Flujo exitoso|Saldo baja|Saldo 1350.55 → 1200|Ajuste de −150.55|
+|3|Caso borde|Mismo saldo|Saldo 1200 → 1200|Sin error y sin registro|
+|4|Caso borde|Saldo en cero|Saldo 1200 → 0|Ajuste de −1200, aceptado|
+|5|Validación de entrada|Saldo negativo|`p_nuevo_monto = -1`|`VALIDATION_006`|
+|6|Lógica de negocio|Meta archivada|Meta con `status = archived`|`BIZ_023`|
+|7|Autorización|Insert directo a la tabla|`insert` vía API|Rechazado por RLS (sin política de insert)|
+|8|Aislamiento|Efecto sobre cuentas|Cualquier ajuste|`saldo_actual` de las cuentas y conteo de `transactions` sin cambio|
+|9|Integración|Retirar rendimientos|Inicial 1000 + ajustes 200; retiro de 1150|Aceptado; un retiro de 50.01 adicional → `BIZ_025`|
+|10|Integración|Editar retiro con rendimientos|`update_transaction` a 1200 / a 1200.01|Aceptado / `BIZ_025`|
+|11|Integridad|Borrar la meta|`delete` de `savings_goals`|Sus ajustes se borran en cascada|
+
+**Referencia de diseño**
+
+- Pantalla: detalle de meta (CU-044) — botón "Adjust balance" junto a Contribute/Withdraw, mismo diálogo que el ajuste de saldo de cuenta.
+
 ---
 
 ## Cambios en otros documentos
@@ -1111,6 +1259,7 @@ Ver documento adjunto de actualización del registro (`registro-actualizacion-ah
 |---|---|---|---|
 |2026-08-22|Se crea el módulo Ahorros y Metas: colección `savings_goals` (meta con nombre, emoji, monto objetivo, monto inicial opcional, fecha límite opcional); se habilita el flujo de captura de `aportacion_meta` (ya reservado) y se introduce `retiro_meta` (nuevo), ambos como documento único vía el nuevo campo `transactions.meta_id`, sin el patrón de dos documentos enlazados que sí usan transferencia y pago a tarjeta. Se agregan CU-042 a CU-048. Una meta es independiente de cualquier cuenta (cubeta libre); su archivado es siempre manual, sin relación con alcanzar el monto objetivo.|CU-042 a CU-048|Se actualiza [[data-model-registry]] con la colección `savings_goals`, la extensión de `transactions` y `budgets`, nuevas relaciones, diagrama ER e índice de numeración. Se modifica [[presupuesto]]: se retira `categoria_reservada` (con `RN-070`, `VALIDATION_019`, y su índice) y se sustituye por `budgets.meta_id`, un renglón presupuestable por meta activa. Se modifica [[transacciones]]: se corrige el resumen del módulo, se agrega `retiro_meta` al enum `tipo`, se corrige el alcance de `transaccion_relacionada_id`, y CU-017 gana `meta_id` como campo editable. Queda pendiente, para cuando le toque su turno, corregir `RN-087` de [[reportes]].|
 |2026-08-22|**Corrección de numeración, detectada al iniciar la construcción en código**: este documento se había numerado (CU-035 a CU-041, RN-107 a RN-139, `VALIDATION_023`, `BIZ_022`) sin consultar el índice de numeración real — colisionaba con `CU-035` y `RN-107`–`RN-111` de [[transacciones]] (acciones en lote), `RN-112`–`RN-117` de [[presupuesto]], `RN-118`/`RN-119` de [[categorias]], y `VALIDATION_023`/`BIZ_022` de [[transacciones]] (los 4 ya asignados en sesiones previas de construcción). Se renumeró todo el documento a la siguiente secuencia libre: `CU-035`→`CU-042` … `CU-041`→`CU-048`; `RN-107`→`RN-120` … `RN-139`→`RN-152`; `VALIDATION_023`→`VALIDATION_026`; `BIZ_022`→`BIZ_026`. Ningún otro documento cambió sus propios números — solo se corrigieron las referencias colisionadas dentro de este archivo y en [[data-model-registry]].|CU-042 a CU-048|Se actualiza [[data-model-registry]]: índice de numeración e historial de cambios.|
+|2026-09-16|Se agrega CU-084, ajuste de saldo de una meta, surgido del uso real: las metas guardadas en instrumentos con rendimientos crecen sin que el usuario aporte, y esa diferencia no podía registrarse porque una aportación exige cuenta de origen. El usuario captura el saldo nuevo y el sistema registra la diferencia (RN-333, RN-334). El ajuste vive en la tabla nueva `savings_goal_adjustments` y **no** en `transactions`, que exige una cuenta en cada fila; la vista nueva `savings_goal_movements` reúne aportaciones, retiros y ajustes como única definición del saldo de una meta, leída por las pantallas y por la validación de retiros (RN-335) — así los rendimientos también pueden retirarse. Los ajustes no cuentan como aportación en Presupuesto ni en Analytics (RN-336). Se revisa RN-126. Sin códigos de error nuevos.|CU-043, CU-044, CU-048, CU-084|Se actualiza [[data-model-registry]]: tabla `savings_goal_adjustments`, vista `savings_goal_movements`, relaciones, diagrama ER e índice de numeración hasta CU-084 / RN-336. [[dashboard]]: Networth incluye los ajustes en Cash & Savings y en su histórico.|
 |2026-09-05|Ajustes de seguimiento sobre el módulo ya construido, sin cambios de esquema. La card del listado pasa a mostrar la fecha límite como pill en su renglón de cierre, en lugar del tiempo restante, y ese renglón gana una altura mínima fija (RN-290): la pill en un renglón propio hacía más alta a la card con fecha y, al estirarse la fila del grid, dejaba a las demás con un hueco al pie. El detalle de una meta con fecha límite gana el bloque "Savings pace" (RN-291, RN-292): cuánto hay que ahorrar por día, semana y mes para llegar a tiempo, calculado al vuelo y puramente informativo. Se revisa RN-129 en consecuencia.|CU-043, CU-044|Se actualiza [[data-model-registry]]: índice de numeración hasta RN-292. Mismo ajuste de card en [[creditos-deudas]] (RN-293).|
 
 ## Referencias

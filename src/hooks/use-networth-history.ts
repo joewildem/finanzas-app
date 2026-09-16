@@ -70,10 +70,8 @@ export function useNetworthHistory(periodo: NetworthPeriod, customRange?: { fech
       accountIds.length
         ? supabase.from('transactions').select('account_id, monto, fecha, tipo').in('account_id', accountIds)
         : Promise.resolve({ data: [] as { account_id: string; monto: number; fecha: string; tipo: string }[], error: null }),
-      supabase
-        .from('transactions')
-        .select('meta_id, monto, fecha')
-        .in('tipo', ['aportacion_meta', 'retiro_meta']),
+      // RN-335: el saldo "a la fecha" de una meta incluye los ajustes registrados hasta ese corte.
+      supabase.from('savings_goal_movements').select('meta_id, monto, fecha'),
       supabase.from('transactions').select('deuda_id, monto_capital, fecha').eq('tipo', 'pago_deuda'),
     ])
     const secondError = accountTxRes.error ?? goalTxRes.error ?? debtTxRes.error
