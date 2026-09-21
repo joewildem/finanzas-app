@@ -4,6 +4,7 @@ import {
   endOfMonth,
   format,
   isAfter,
+  isBefore,
   startOfMonth,
   startOfYear,
   subDays,
@@ -120,4 +121,27 @@ export function computePreviousPeriodRange(periodo: Period, opts: PeriodOpts = {
       return { from: subDays(opts.fechaInicio, dias), to: subDays(opts.fechaInicio, 1) }
     }
   }
+}
+
+// `to` opcional además de `undefined`: así encaja con el `DateRange` de react-day-picker sin que
+// el componente tenga que traducir entre ambos.
+export interface PickedRange {
+  from: Date | undefined
+  to?: Date | undefined
+}
+
+// Arma un rango a partir de los clics del usuario en un calendario, en dos fases explícitas: el
+// primer clic fija el inicio y el segundo lo cierra, ordenándolo por si eligió una fecha anterior al
+// inicio. Dos clics en el mismo día son un rango de un solo día. Un clic con el rango ya completo
+// empieza uno nuevo.
+//
+// Existe porque el `addToRange` de react-day-picker devuelve `{ from: día, to: día }` desde el
+// PRIMER clic (su `min` es 0 por defecto): el rango nacía "completo", así que el calendario se
+// cerraba antes de poder elegir el fin y el siguiente clic reemplazaba el inicio o el fin según
+// fuera anterior o posterior a lo ya elegido. La misma fecha quedaba unas veces como inicio y otras
+// como fin, sin que el usuario pudiera predecirlo.
+export function nextPickedRange(current: PickedRange, day: Date): PickedRange {
+  const empiezaRangoNuevo = !current.from || current.to !== undefined
+  if (empiezaRangoNuevo) return { from: day, to: undefined }
+  return isBefore(day, current.from!) ? { from: day, to: current.from } : { from: current.from, to: day }
 }

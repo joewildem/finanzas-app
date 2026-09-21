@@ -5,6 +5,7 @@ import type { DateRange } from 'react-day-picker'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { nextPickedRange } from '@/lib/date-periods'
 import { formatDate, formatDateShort } from '@/lib/dates'
 
 export type DateRangePreset =
@@ -77,6 +78,16 @@ export function DateRangeFilter({ onChange }: { onChange: (value: DateRangeValue
     if (next === 'custom') setCalendarOpen(true)
   }
 
+  // El rango lo arma `nextPickedRange` a partir del día que se tocó, no react-day-picker — ver ahí
+  // por qué (su primer clic ya devuelve un rango "completo").
+  function pickCustomDate(day: Date) {
+    const next = nextPickedRange(customRange, day)
+    setCustomRange(next)
+    onChange(computeRange('custom', next))
+    // Solo cuando el rango quedó completo: con el inicio a medias el calendario sigue abierto.
+    if (next.to) setCalendarOpen(false)
+  }
+
   const customLabel =
     customRange.from && customRange.to
       ? `${formatDateShort(customRange.from)} – ${formatDate(customRange.to)}`
@@ -119,12 +130,8 @@ export function DateRangeFilter({ onChange }: { onChange: (value: DateRangeValue
               mode="range"
               numberOfMonths={2}
               selected={customRange}
-              onSelect={(range) => {
-                const next = { from: range?.from, to: range?.to }
-                setCustomRange(next)
-                onChange(computeRange('custom', next))
-                if (next.from && next.to) setCalendarOpen(false)
-              }}
+              // Se ignora el rango que calcula la librería; lo que importa es qué día se tocó.
+              onSelect={(_range, triggerDate) => pickCustomDate(triggerDate)}
             />
           </PopoverContent>
         </Popover>
