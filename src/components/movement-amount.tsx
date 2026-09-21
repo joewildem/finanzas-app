@@ -13,7 +13,7 @@ export function MovementAmount({ monto, className }: { monto: number; className?
   return (
     <p
       className={cn(
-        'font-mono text-sm',
+        'font-mono text-xs',
         monto < 0 && 'text-destructive',
         monto > 0 && 'text-success',
         monto === 0 && 'text-card-foreground',
