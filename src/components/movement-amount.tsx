@@ -13,7 +13,10 @@ export function MovementAmount({ monto, className }: { monto: number; className?
   return (
     <p
       className={cn(
-        'font-mono text-xs',
+        // 13px es deliberado y fuera de la escala de Tailwind: `text-sm` (14px) competía con el
+        // nombre del movimiento y `text-xs` (12px) se quedaba corto. Va con `leading-5` explícito
+        // porque una talla arbitraria no trae interlineado propio, a diferencia de `text-sm`.
+        'font-mono text-[13px] leading-5',
         monto < 0 && 'text-destructive',
         monto > 0 && 'text-success',
         monto === 0 && 'text-card-foreground',
