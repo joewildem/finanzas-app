@@ -324,7 +324,7 @@ export function TransactionsPage() {
 
                 return (
                   <div key={transaction.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
                       {selectionMode && (
                         <Checkbox
                           checked={selectedIds.has(transaction.id)}
@@ -336,15 +336,20 @@ export function TransactionsPage() {
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                         <HugeiconsIcon icon={icon} className="size-4" />
                       </span>
-                      <div>
-                        <p className="text-sm text-card-foreground">{label}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {transaction.account?.nombre ?? '—'} · {formatDate(transaction.fecha)}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm text-card-foreground">{label}</p>
+                        {/* La fecha salió de este renglón y ahora tiene columna propia: aquí se lee
+                            de qué cuenta salió y la nota, que antes no se veía sin abrir a editar. */}
+                        <p className="truncate text-xs text-muted-foreground">
+                          {[transaction.account?.nombre ?? '—', transaction.nota].filter(Boolean).join(' · ')}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
-                      <MovementAmount monto={transaction.monto} className="mr-1" />
+                      <p className="w-24 shrink-0 text-right font-mono text-xs text-muted-foreground">
+                        {formatDate(transaction.fecha)}
+                      </p>
+                      <MovementAmount monto={transaction.monto} className="mr-1 ml-3" />
                       {!isAdjustment && !selectionMode && (
                         <>
                           {!isMsiPurchase && (

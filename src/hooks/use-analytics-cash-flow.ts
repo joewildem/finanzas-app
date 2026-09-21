@@ -3,6 +3,7 @@ import { endOfMonth, parse, startOfMonth } from 'date-fns'
 
 import { useCategoryGroups } from '@/hooks/use-category-groups'
 import { useDataVersion } from '@/hooks/use-data-version'
+import { formatDateParam } from '@/lib/dates'
 import { computePeriodMonths, type Period } from '@/lib/date-periods'
 import { supabase } from '@/lib/supabase'
 
@@ -48,8 +49,8 @@ export function useAnalyticsCashFlow(periodo: Period, customRange?: { fechaInici
       .from('transactions')
       .select('category_id, monto, tipo, fecha')
       .in('tipo', ['ingreso', 'gasto'])
-      .gte('fecha', rangeFrom.toISOString())
-      .lte('fecha', rangeTo.toISOString())
+      .gte('fecha', formatDateParam(rangeFrom))
+      .lte('fecha', formatDateParam(rangeTo))
 
     if (txError) {
       setError(txError.message)

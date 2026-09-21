@@ -26,6 +26,7 @@ import { useDebts } from '@/hooks/use-debts'
 import { useSavingsGoals } from '@/hooks/use-savings-goals'
 import type { TransactionWithRelations } from '@/hooks/use-transactions'
 import type { AccountType } from '@/lib/accounts'
+import { parseDate } from '@/lib/dates'
 import { supabase } from '@/lib/supabase'
 import { findTransactionErrorCodeInMessage, type TransactionErrorCode } from '@/lib/transaction-errors'
 import { cn } from '@/lib/utils'
@@ -157,7 +158,7 @@ export function AddTransactionDialog({
     setGoalId(tx.meta_id ?? '')
     setDeudaId(tx.deuda_id ?? '')
     setInterestAmount(tx.monto_interes ?? 0)
-    setFecha(new Date(tx.fecha))
+    setFecha(parseDate(tx.fecha))
     setNota(tx.nota ?? '')
     setSubmitError(null)
 

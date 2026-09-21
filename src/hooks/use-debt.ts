@@ -24,7 +24,10 @@ export function useDebt(debtId: string | undefined) {
         .from('transactions')
         .select('*, account:accounts(nombre,color)')
         .eq('deuda_id', debtId)
-        .order('fecha', { ascending: false }),
+        .order('fecha', { ascending: false })
+        // La fecha ya no lleva hora: sin desempate, dos movimientos del mismo día salían en orden
+        // arbitrario y podían intercambiarse entre consultas.
+        .order('created_at', { ascending: false }),
     ])
 
     if (debtResult.error) {

@@ -19,7 +19,7 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |Contador|Último usado|Módulo de origen|
 |---|---|---|
 |Casos de uso (CU-XXX)|CU-084|ahorros-y-metas|
-|Reglas de negocio (RN-XXX)|RN-336|ahorros-y-metas|
+|Reglas de negocio (RN-XXX)|RN-340|transacciones|
 |Errores de validación (VALIDATION_XXX)|VALIDATION_041|suscripciones|
 |Errores de autenticación/autorización (AUTH_XXX)|AUTH_003|auth|
 |Errores de lógica de negocio (BIZ_XXX)|BIZ_036|suscripciones|
@@ -145,7 +145,7 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |`concepto`|text|Sí|—|CU-006 (fijo: "Ajuste manual" para `tipo=ajuste`); autogenerado ("Aportación a meta: {nombre}" / "Retiro de meta: {nombre}" / "Pago a deuda: {nombre}") para `aportacion_meta`/`retiro_meta`/`pago_deuda` (RN-130, RN-136 de [[ahorros-y-metas]]; RN-220 de [[creditos-deudas]])|
 |`monto`|numeric(14,2)|Sí|—|CU-006; con signo desde CU-013 (RN-038): negativo = salida, positivo = entrada; editable en CU-017 (RN-052)|
 |`nota`|text\|null|No|`null`|CU-013 a CU-015; editable en CU-017; máx. 140 caracteres|
-|`fecha`|timestamptz|Sí|`now()`|CU-006; editable en CU-017|
+|`fecha`|date|Sí|`today_local()`|CU-006; editable en CU-017. **El día del calendario, sin hora** — era `timestamptz` hasta el 2026-09-20 (RN-337 de [[transacciones]]); el instante del registro vive en `created_at`. El default resuelve la zona del usuario, no la del servidor (RN-338)|
 |`created_at`|timestamptz|Sí|`now()`|CU-006|
 |`updated_at`|timestamptz|Sí|`now()`|CU-013 en adelante; se actualiza en CU-017|
 
@@ -566,7 +566,7 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |`user_id`|uuid (FK → users.id, `on delete cascade`)|Sí|—|CU-084|
 |`meta_id`|uuid (FK → savings_goals.id, `on delete cascade`)|Sí|—|CU-084; la cascada es deliberada: sin su meta un ajuste no significa nada, y permite a `clean_my_data` borrar metas sin conocer esta tabla|
 |`monto`|numeric(14,2)|Sí|—|CU-084 (RN-334); diferencia desde la perspectiva de la meta — positivo si el saldo sube; nunca cero|
-|`fecha`|timestamptz|Sí|`now()`|CU-084; el momento del ajuste, no capturable|
+|`fecha`|date|Sí|`today_local()`|CU-084; el día del ajuste, no capturable. Sigue a `transactions.fecha` (RN-337): toda fecha del sistema es un día, no un instante|
 |`created_at`|timestamptz|Sí|`now()`|CU-084|
 
 > Política RLS: `auth.uid() = user_id` **solo en `select`**. Sin políticas de `insert`, `update` ni
@@ -605,7 +605,7 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |`account_id`|uuid\|null|`transactions.account_id`; `null` en ajustes|
 |`account_nombre`|text\|null|`accounts.nombre` (left join); `null` en ajustes|
 |`monto`|numeric(14,2)|`transactions.monto`, o `-savings_goal_adjustments.monto`|
-|`fecha`|timestamptz|Ambas|
+|`fecha`|date|Ambas|
 |`nota`|text\|null|`transactions.nota`; `null` en ajustes|
 |`created_at`|timestamptz|Ambas|
 
@@ -843,6 +843,7 @@ _(ninguno por ahora. Si un módulo nuevo contradice una definición previa de un
 |2026-09-06|dashboard|Ajuste visual de las cards de cuenta (RN-331, RN-237 revisada). **Sin cambios de esquema ni de cálculo.** Las cards de débito/efectivo y las de tarjeta de crédito pasan a compartir estructura: nombre y saldo juntos en el centro, y un único renglón al pie cuyo contenido es lo que las distingue —tipo de cuenta en unas, barra de utilización en otras—. El indicador de avance de gasto del ciclo se retira de la card —se probó como segunda barra y como chip, y en ambos casos competía con el saldo—; su cálculo queda intacto y su presentación pendiente de decidir (RN-237 revisada). La regla toma el siguiente número libre del índice general (RN-331) y no uno del rango original de [[dashboard]]: RN-242 ya estaba en uso por la pestaña Networth de ese mismo documento. CU afectados: CU-061, CU-063.|
 |2026-09-07|dashboard|El Dashboard se actualiza solo ante cualquier escritura, sin recargar la página (RN-332). **Sin cambios de esquema ni de cálculo.** La señal de invalidación se emite interceptando las peticiones no-lectura a `/rest/v1/` en el cliente de Supabase, y no desde cada punto de escritura: son ~35 repartidos en la aplicación, y uno que olvidara avisar reintroduciría el problema en silencio. Alcance actual: los hooks de lectura de las tres pestañas del Dashboard más `useAccounts` y `useCategoryGroups`, que las alimentan. El resto de las pantallas conserva su mecanismo propio (`subscribe` de `AddTransactionProvider` y `onSuccess` directo). CU afectados: CU-061 a CU-071.|
 |2026-09-16|ahorros-y-metas|Se agrega CU-084 (ajuste de saldo de una meta), RN-333 a RN-336; se revisa RN-126. Se registran la tabla `savings_goal_adjustments` y la vista `savings_goal_movements`, sus relaciones y la entidad en el diagrama ER. **El ajuste no vive en `transactions`**: esa tabla exige `account_id` y un ajuste de meta no mueve ninguna cuenta; volverlo nullable habría obligado a cada RPC y listado de transacciones a contemplar el caso. La vista es la única definición del saldo de una meta y la leen tanto las pantallas como los RPC de retiro, para que un rendimiento visible también sea retirable. Sin códigos de error nuevos. Índice de numeración hasta CU-084 / RN-336. Se corrige además el formato de la fila del 2026-09-07, que traía cinco celdas en una tabla de tres columnas.|
+|2026-09-20|transacciones|`transactions.fecha` y `savings_goal_adjustments.fecha` pasan de `timestamptz` a `date` (RN-337 a RN-340 de [[transacciones]]). Guardaban el día que el usuario elige dentro de una columna de instantes: el día viajaba suelto, Postgres lo fijaba a medianoche UTC y la pantalla lo devolvía a hora de México, un día antes. Se agrega la función `public.today_local()` —único lugar donde vive la zona horaria— y once funciones cambian `p_fecha` de `timestamptz` a `date`, lo que obliga a dar de baja su firma anterior para no dejar sobrecargas vivas. La vista `savings_goal_movements` se recrea con `fecha` como `date`. Las filas existentes **no** se corrigen (decisión del usuario): se convierten al día que ya mostraba la pantalla. Índice de numeración hasta RN-340.|
 
 ---
 

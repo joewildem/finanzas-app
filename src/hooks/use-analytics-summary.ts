@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useCategoryGroups } from '@/hooks/use-category-groups'
 import { useDataVersion } from '@/hooks/use-data-version'
 import { buildPeriodAmount, type PeriodAmount } from '@/lib/analytics'
+import { formatDateParam } from '@/lib/dates'
 import { computeCurrentPeriodRange, computePreviousPeriodRange, type Period } from '@/lib/date-periods'
 import { supabase } from '@/lib/supabase'
 
@@ -51,9 +52,9 @@ export function useAnalyticsSummary(periodo: Period, customRange?: { fechaInicio
       .from('transactions')
       .select('category_id, monto, tipo, fecha')
       .in('tipo', ['ingreso', 'gasto', 'aportacion_meta', 'retiro_meta'])
-    if (previous) query = query.gte('fecha', previous.from.toISOString())
-    else if (current) query = query.gte('fecha', current.from.toISOString())
-    if (current) query = query.lte('fecha', current.to.toISOString())
+    if (previous) query = query.gte('fecha', formatDateParam(previous.from))
+    else if (current) query = query.gte('fecha', formatDateParam(current.from))
+    if (current) query = query.lte('fecha', formatDateParam(current.to))
 
     const { data, error: txError } = await query
     if (txError) {

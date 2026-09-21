@@ -29,6 +29,9 @@ export function useMsiPlans() {
       .select('id, account_id, concepto, monto, nota, fecha, msi_meses, msi_mes_inicio, msi_liquidado_mes, account:accounts(nombre)')
       .eq('tipo', 'compra_msi')
       .order('fecha', { ascending: false })
+      // La fecha ya no lleva hora: sin desempate, dos movimientos del mismo día salían en orden
+      // arbitrario y podían intercambiarse entre consultas.
+      .order('created_at', { ascending: false })
 
     if (error) {
       setError(error.message)

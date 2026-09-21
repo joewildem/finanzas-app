@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { endOfMonth, isAfter, parse } from 'date-fns'
 
 import { useDataVersion } from '@/hooks/use-data-version'
+import { parseDate } from '@/lib/dates'
 import type { Account } from '@/lib/accounts'
 import { supabase } from '@/lib/supabase'
 
@@ -88,7 +89,7 @@ export function useAccountsMonthlyBalance(anio: number) {
           return { account_id: account.id, nombre: account.nombre, color: account.color, balance: null }
         }
         const movimientos = txs
-          .filter((t) => t.account_id === account.id && !isAfter(new Date(t.fecha), monthEnd))
+          .filter((t) => t.account_id === account.id && !isAfter(parseDate(t.fecha), monthEnd))
           .reduce((sum, t) => sum + t.monto, 0)
         return {
           account_id: account.id,

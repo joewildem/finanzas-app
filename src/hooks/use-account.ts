@@ -20,7 +20,10 @@ export function useAccount(accountId: string | undefined) {
         .from('transactions')
         .select('*')
         .eq('account_id', accountId)
-        .order('fecha', { ascending: false }),
+        .order('fecha', { ascending: false })
+        // La fecha ya no lleva hora: sin desempate, dos movimientos del mismo día salían en orden
+        // arbitrario y podían intercambiarse entre consultas.
+        .order('created_at', { ascending: false }),
     ])
 
     if (accountResult.error) {

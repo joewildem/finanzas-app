@@ -3,6 +3,7 @@ import { subMonths } from 'date-fns'
 
 import type { Account } from '@/lib/accounts'
 import { computeCurrentStatementCycle } from '@/lib/dashboard'
+import { formatDateParam, parseDate } from '@/lib/dates'
 import { supabase } from '@/lib/supabase'
 
 export interface CycleSpend {
@@ -37,7 +38,7 @@ export function useCreditCardsCycleSpend(creditAccounts: Account[]) {
         'account_id',
         creditAccounts.map((a) => a.id),
       )
-      .gte('fecha', windowStart.toISOString())
+      .gte('fecha', formatDateParam(windowStart))
 
     if (txError) {
       setError(txError.message)
@@ -55,14 +56,14 @@ export function useCreditCardsCycleSpend(creditAccounts: Account[]) {
         .filter(
           (t) =>
             t.account_id === account.id &&
-            new Date(t.fecha) >= cycle.from &&
-            new Date(t.fecha) < cycle.toExclusive,
+            parseDate(t.fecha) >= cycle.from &&
+            parseDate(t.fecha) < cycle.toExclusive,
         )
         .reduce((sum, t) => sum + Math.abs(t.monto), 0)
 
       result[account.id] = {
-        ciclo_desde: cycle.from.toISOString().slice(0, 10),
-        ciclo_hasta: cycle.toExclusive.toISOString().slice(0, 10),
+        ciclo_desde: formatDateParam(cycle.from),
+        ciclo_hasta: formatDateParam(cycle.toExclusive),
         gasto_ciclo_actual: gasto,
       }
     }

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useCategoryGroups } from '@/hooks/use-category-groups'
 import { useDataVersion } from '@/hooks/use-data-version'
 import type { CategoryFlow } from '@/lib/categories'
+import { formatDateParam } from '@/lib/dates'
 import { computeCurrentPeriodRange, type Period } from '@/lib/date-periods'
 import { supabase } from '@/lib/supabase'
 
@@ -50,7 +51,7 @@ export function useAnalyticsCategoryDistribution(periodo: Period, customRange?: 
     }
 
     let query = supabase.from('transactions').select('category_id, monto, tipo').in('tipo', ['ingreso', 'gasto'])
-    if (range) query = query.gte('fecha', range.from.toISOString()).lte('fecha', range.to.toISOString())
+    if (range) query = query.gte('fecha', formatDateParam(range.from)).lte('fecha', formatDateParam(range.to))
 
     const { data, error: txError } = await query
     if (txError) {

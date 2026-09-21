@@ -23,7 +23,10 @@ export function useSavingsGoal(goalId: string | undefined) {
         .from('savings_goal_movements')
         .select('*')
         .eq('meta_id', goalId)
-        .order('fecha', { ascending: false }),
+        .order('fecha', { ascending: false })
+        // La fecha ya no lleva hora: sin desempate, dos movimientos del mismo día salían en orden
+        // arbitrario y podían intercambiarse entre consultas.
+        .order('created_at', { ascending: false }),
     ])
 
     if (goalResult.error) {

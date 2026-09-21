@@ -1,6 +1,7 @@
 import { isAfter } from 'date-fns'
 
 import type { Account } from '@/lib/accounts'
+import { parseDate } from '@/lib/dates'
 import { computePeriodMonths, PERIOD_LABELS, type Period } from '@/lib/date-periods'
 import { computeSaldoActual, DEBT_TYPE_LABELS, type Debt, type DebtType } from '@/lib/debts'
 import { computeExposureBreakdown, type Investment } from '@/lib/investments'
@@ -104,7 +105,7 @@ export function computeGoalProgress(networthActual: number, montoObjetivo: numbe
 // --- Reconstrucción "a la fecha" (RN-249) ------------------------------------------------------
 
 function sumSignedUpTo(movimientos: { monto: number; fecha: string }[], cutoff: Date): number {
-  return movimientos.filter((m) => !isAfter(new Date(m.fecha), cutoff)).reduce((sum, m) => sum + m.monto, 0)
+  return movimientos.filter((m) => !isAfter(parseDate(m.fecha), cutoff)).reduce((sum, m) => sum + m.monto, 0)
 }
 
 // RN-040/RN-049 revisadas (2026-09-01, [[transacciones]]): en una cuenta `tipo = credito`,
@@ -121,7 +122,7 @@ export function computeAccountBalanceAsOf(
   if (isAfter(new Date(account.created_at), cutoff)) return 0
   const isCredito = account.tipo === 'credito'
   const delta = movimientos
-    .filter((m) => !isAfter(new Date(m.fecha), cutoff))
+    .filter((m) => !isAfter(parseDate(m.fecha), cutoff))
     .reduce((sum, m) => sum + (isCredito && m.tipo !== 'ajuste' ? -m.monto : m.monto), 0)
   return account.saldo_inicial + delta
 }
@@ -142,7 +143,7 @@ export function computeDebtBalanceAsOf(
 ): number {
   if (isAfter(new Date(debt.created_at), cutoff)) return 0
   const capitalPagado = pagos
-    .filter((p) => !isAfter(new Date(p.fecha), cutoff))
+    .filter((p) => !isAfter(parseDate(p.fecha), cutoff))
     .reduce((sum, p) => sum + p.monto_capital, 0)
   return debt.monto_original - capitalPagado
 }

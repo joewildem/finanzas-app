@@ -31,6 +31,9 @@ export function useTransactions(filters: TransactionFilters) {
       .from('transactions')
       .select('*, account:accounts(nombre,color,tipo), category:categories(nombre,icono)')
       .order('fecha', { ascending: false })
+      // La fecha ya no lleva hora: sin desempate, dos movimientos del mismo día salían en orden
+      // arbitrario y podían intercambiarse entre consultas.
+      .order('created_at', { ascending: false })
       .order('created_at', { ascending: false })
 
     if (tipo && tipo !== 'all') query = query.eq('tipo', tipo)
