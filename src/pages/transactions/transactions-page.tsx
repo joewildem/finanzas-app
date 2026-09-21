@@ -350,7 +350,9 @@ export function TransactionsPage() {
                     </div>
                     {/* Columna de fecha: ancho fijo y fuera del grupo del monto. Dentro de ese grupo
                         se recorría con cada monto, porque su posición dependía del ancho del número. */}
-                    <p className="hidden w-28 shrink-0 text-center font-serif text-xs text-muted-foreground sm:block">
+                    {/* Sin clase de fuente: hereda la sans del tema, la misma del nombre del
+                        movimiento. `font-mono` queda reservado para cifras. */}
+                    <p className="hidden w-28 shrink-0 text-center text-xs text-muted-foreground sm:block">
                       {formatDate(transaction.fecha)}
                     </p>
                     <div className="flex shrink-0 items-center gap-1">
