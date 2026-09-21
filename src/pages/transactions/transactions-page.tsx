@@ -324,7 +324,7 @@ export function TransactionsPage() {
 
                 return (
                   <div key={transaction.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                    <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
                       {selectionMode && (
                         <Checkbox
                           checked={selectedIds.has(transaction.id)}
@@ -339,36 +339,47 @@ export function TransactionsPage() {
                       <div className="min-w-0">
                         <p className="truncate text-sm text-card-foreground">{label}</p>
                         {/* La fecha salió de este renglón y ahora tiene columna propia: aquí se lee
-                            de qué cuenta salió y la nota, que antes no se veía sin abrir a editar. */}
+                            de qué cuenta salió y la nota, que antes no se veía sin abrir a editar.
+                            En pantallas angostas no cabe la columna, así que ahí vuelve a este
+                            renglón en vez de desaparecer. */}
                         <p className="truncate text-xs text-muted-foreground">
                           {[transaction.account?.nombre ?? '—', transaction.nota].filter(Boolean).join(' · ')}
+                          <span className="sm:hidden"> · {formatDate(transaction.fecha)}</span>
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <p className="w-24 shrink-0 text-right font-mono text-xs text-muted-foreground">
-                        {formatDate(transaction.fecha)}
-                      </p>
-                      <MovementAmount monto={transaction.monto} className="mr-1 ml-3" />
-                      {!isAdjustment && !selectionMode && (
-                        <>
-                          {!isMsiPurchase && (
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label="Edit transaction"
-                              onClick={() => openEdit(transaction)}
-                            >
-                              <HugeiconsIcon icon={PencilEdit01Icon} className="size-4" />
-                            </Button>
-                          )}
-                          <DeleteTransactionDialog
-                            transactionId={transaction.id}
-                            isLinked={transaction.transaccion_relacionada_id !== null}
-                            onDeleted={refetch}
-                          />
-                        </>
-                      )}
+                    {/* Columna de fecha: ancho fijo y fuera del grupo del monto. Dentro de ese grupo
+                        se recorría con cada monto, porque su posición dependía del ancho del número. */}
+                    <p className="hidden w-28 shrink-0 text-center font-serif text-xs text-muted-foreground sm:block">
+                      {formatDate(transaction.fecha)}
+                    </p>
+                    <div className="flex shrink-0 items-center gap-1">
+                      {/* Ancho fijo también aquí: sin él, un monto largo empujaba la fecha de ese
+                          renglón y las columnas dejaban de alinearse entre sí. */}
+                      <MovementAmount monto={transaction.monto} className="w-28 text-right" />
+                      {/* El espacio de las acciones se reserva siempre: un ajuste no las lleva, y sin
+                          reservarlo su monto y su fecha quedaban corridos respecto a los demás. */}
+                      <div className="flex w-18 shrink-0 items-center justify-end gap-1">
+                        {!isAdjustment && !selectionMode && (
+                          <>
+                            {!isMsiPurchase && (
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label="Edit transaction"
+                                onClick={() => openEdit(transaction)}
+                              >
+                                <HugeiconsIcon icon={PencilEdit01Icon} className="size-4" />
+                              </Button>
+                            )}
+                            <DeleteTransactionDialog
+                              transactionId={transaction.id}
+                              isLinked={transaction.transaccion_relacionada_id !== null}
+                              onDeleted={refetch}
+                            />
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )
