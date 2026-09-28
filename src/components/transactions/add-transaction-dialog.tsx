@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { ArrowRight01Icon, CancelCircleIcon, ChevronDownIcon, Note01Icon } from '@hugeicons/core-free-icons'
+import { ArrowRight01Icon, Calculator01Icon, CancelCircleIcon, ChevronDownIcon, Note01Icon } from '@hugeicons/core-free-icons'
 import { format } from 'date-fns'
 
 import { CurrencyInput } from '@/components/accounts/currency-input'
@@ -61,7 +61,8 @@ const CHIP_INACTIVE_CLASS = 'text-muted-foreground hover:text-foreground'
 // quedan de solo lectura (RN-051) y el submit llama a `update_transaction` en vez de a los RPC de
 // alta. Invocable desde cualquier botón "Add record" vía AddTransactionProvider en modo alta, o
 // directamente desde el listado (CU-016) en modo edición. La calculadora es un segundo Dialog
-// independiente (CalculatorDialog), abierto/cerrado con la pestaña del borde derecho.
+// independiente (CalculatorDialog): en escritorio se abre con la pestaña del borde derecho y en
+// móvil con el botón del encabezado, donde además ocupa el lugar del teclado.
 export function AddTransactionDialog({
   open,
   onOpenChange,
@@ -231,6 +232,18 @@ export function AddTransactionDialog({
     })
   }
 
+  // "Save and add another" (solo móvil): guarda y deja el formulario listo para el siguiente en
+  // lugar de cerrar. Va en una ref y no en estado porque se escribe en el clic y se lee dentro del
+  // submit que ese mismo clic dispara — un `setState` no habría llegado a tiempo.
+  const seguirCapturandoRef = useRef(false)
+
+  function finishSubmit(seguirCapturando: boolean) {
+    if (seguirCapturando) resetFormState()
+    else onOpenChange(false)
+    // En ambos casos el alta ocurrió: las pantallas que escuchan deben refrescarse igual.
+    onSuccess?.()
+  }
+
   function handleCalculatorDone() {
     const parsed = parseFloat(calcExpression)
     setAmount(Number.isFinite(parsed) ? Math.max(parsed, 0) : 0)
@@ -240,6 +253,11 @@ export function AddTransactionDialog({
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     setSubmitError(null)
+
+    // Se lee y se apaga de inmediato: si abajo alguna validación corta el envío, la bandera no
+    // queda encendida esperando al próximo intento, que sí cerraría cuando no debía.
+    const seguirCapturando = seguirCapturandoRef.current
+    seguirCapturandoRef.current = false
 
     if (!amount || amount <= 0) {
       setSubmitError('VALIDATION_012')
@@ -288,8 +306,7 @@ export function AddTransactionDialog({
         setSubmitError(findTransactionErrorCodeInMessage(error.message) ?? 'SYS_001')
         return
       }
-      onOpenChange(false)
-      onSuccess?.()
+      finishSubmit(seguirCapturando)
       return
     }
 
@@ -314,8 +331,7 @@ export function AddTransactionDialog({
         setSubmitError(findTransactionErrorCodeInMessage(error.message) ?? 'SYS_001')
         return
       }
-      onOpenChange(false)
-      onSuccess?.()
+      finishSubmit(seguirCapturando)
       return
     }
 
@@ -341,8 +357,7 @@ export function AddTransactionDialog({
         setSubmitError(findTransactionErrorCodeInMessage(error.message) ?? 'SYS_001')
         return
       }
-      onOpenChange(false)
-      onSuccess?.()
+      finishSubmit(seguirCapturando)
       return
     }
 
@@ -364,8 +379,7 @@ export function AddTransactionDialog({
       setSubmitError(findTransactionErrorCodeInMessage(error.message) ?? 'SYS_001')
       return
     }
-    onOpenChange(false)
-    onSuccess?.()
+    finishSubmit(seguirCapturando)
   }
 
   return (
@@ -382,8 +396,22 @@ export function AddTransactionDialog({
           {/* En móvil el wrapper toma todo el alto del modal y el scroll vive aquí adentro; en
               escritorio conserva su tope de 85vh. */}
           <div className="flex h-full max-h-none flex-col gap-4 overflow-y-auto p-4 md:h-auto md:max-h-[85vh]">
-            <DialogHeader>
+            {/* `pr-10` deja libre la esquina donde va la X del modal, para que el botón de la
+                calculadora no quede encima de ella. */}
+            <DialogHeader className="max-md:flex-row max-md:items-center max-md:justify-between max-md:pr-10">
               <DialogTitle>{isEditMode ? 'Edit record' : 'Add record'}</DialogTitle>
+              {/* En móvil la calculadora se abre desde aquí; la pestaña del borde derecho no cabe
+                  a pantalla completa (quedaría fuera de la pantalla). */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={toggleCalculator}
+                aria-label={calculatorOpen ? 'Close calculator' : 'Open calculator'}
+                className="md:hidden"
+              >
+                <HugeiconsIcon icon={Calculator01Icon} className="size-5" />
+              </Button>
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="contents">
@@ -591,18 +619,40 @@ export function AddTransactionDialog({
             {/* `max-md:mt-auto`: a pantalla completa el formulario puede no llenar el alto, y sin
                 esto los botones quedarían flotando a media pantalla en vez de al pie. */}
             <DialogFooter className={cn('max-md:mt-auto', isEditMode ? 'sm:justify-end' : 'sm:justify-between')}>
+              {/* Escritorio: sin cambios. */}
               {!isEditMode && (
-                <Button type="button" variant="ghost" onClick={resetFormState}>
+                <Button type="button" variant="ghost" onClick={resetFormState} className="max-md:hidden">
                   Clear form
                 </Button>
               )}
-              <div className="flex gap-2">
+              <div className="flex gap-2 max-md:hidden">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting || !amount}>
                   {isSubmitting ? 'Saving…' : isEditMode ? 'Save changes' : 'Add record'}
                 </Button>
+              </div>
+
+              {/* Móvil: el principal guarda y cierra; el de abajo guarda y deja el formulario listo
+                  para el siguiente, para encadenar varios registros sin salir y volver a entrar.
+                  "Clear form" y "Cancel" no están: recargar o cerrar cubre ambos casos. */}
+              <div className="flex flex-col gap-2 md:hidden">
+                <Button type="submit" disabled={isSubmitting || !amount}>
+                  {isSubmitting ? 'Saving…' : isEditMode ? 'Save changes' : 'Add record'}
+                </Button>
+                {!isEditMode && (
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    disabled={isSubmitting || !amount}
+                    onClick={() => {
+                      seguirCapturandoRef.current = true
+                    }}
+                  >
+                    Save and add another
+                  </Button>
+                )}
               </div>
             </DialogFooter>
             </form>
@@ -616,9 +666,9 @@ export function AddTransactionDialog({
             type="button"
             onClick={toggleCalculator}
             aria-label={calculatorOpen ? 'Close calculator' : 'Open calculator'}
-            // A pantalla completa no hay "fuera del modal": `left-full` dejaría la pestaña fuera de
-            // la pantalla, así que en móvil se ancla por dentro del borde derecho.
-            className="absolute top-1/2 left-full z-[60] ml-2 flex h-14 w-6 -translate-y-1/2 items-center justify-center rounded-lg bg-muted text-muted-foreground ring-1 ring-foreground/10 hover:bg-muted/70 max-md:right-2 max-md:left-auto max-md:ml-0"
+            // Solo escritorio: a pantalla completa no existe un "fuera del modal" donde ponerla, y
+            // en móvil la reemplaza el botón del encabezado.
+            className="absolute top-1/2 left-full z-[60] ml-2 flex h-14 w-6 -translate-y-1/2 items-center justify-center rounded-lg bg-muted text-muted-foreground ring-1 ring-foreground/10 hover:bg-muted/70 max-md:hidden"
           >
             <HugeiconsIcon icon={ArrowRight01Icon} className={cn('size-4 transition-transform', calculatorOpen && 'rotate-180')} />
           </button>
@@ -631,6 +681,7 @@ export function AddTransactionDialog({
         expression={calcExpression}
         onExpressionChange={setCalcExpression}
         onDone={handleCalculatorDone}
+        onResult={setAmount}
       />
     </>
   )

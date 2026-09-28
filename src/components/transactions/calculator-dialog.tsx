@@ -114,20 +114,25 @@ export function applyCalcKey(expression: string, key: CalcKey): string {
 // no debe atenuar ni volver inert al modal principal, ambos quedan usables/visibles a la vez. Se
 // posiciona con `fixed` + `calc()` relativo al centro del viewport, desplazado a la derecha del
 // ancho del modal principal (`max-w-lg` = 32rem) más el espacio de la pestaña que lo activa — ver
-// AddTransactionDialog. El botón "Done" es la única acción que aplica el resultado al monto; X y
-// Escape solo cierran (descartan), igual que el spec original distingue "confirmar" de "cerrar".
+// AddTransactionDialog; en móvil no hay ese "a un lado", así que ocupa el lugar del teclado. "="
+// escribe el resultado en el monto sin cerrar (el usuario espera verlo de los dos lados) y "Done"
+// lo aplica y cierra; X y Escape solo cierran, sin tocar el monto.
 export function CalculatorDialog({
   open,
   onOpenChange,
   expression,
   onExpressionChange,
   onDone,
+  onResult,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   expression: string
   onExpressionChange: (next: string) => void
   onDone: () => void
+  // "=" escribe el resultado en el monto del formulario sin cerrar la calculadora: el usuario
+  // espera ver el número de los dos lados a la vez. "Done" sigue siendo aplicar y cerrar.
+  onResult?: (value: number) => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -136,7 +141,13 @@ export function CalculatorDialog({
   }, [open])
 
   function press(key: CalcKey) {
-    onExpressionChange(applyCalcKey(expression, key))
+    const next = applyCalcKey(expression, key)
+    onExpressionChange(next)
+    if (key.kind === 'equals') {
+      const parsed = parseFloat(next)
+      // Mismo recorte que "Done": un monto negativo no existe en el formulario.
+      if (Number.isFinite(parsed)) onResult?.(Math.max(parsed, 0))
+    }
   }
 
   function handleKeyDown(event: React.KeyboardEvent) {
@@ -172,6 +183,11 @@ export function CalculatorDialog({
           className={cn(
             'fixed top-1/2 left-[calc(50%+19rem)] z-50 flex w-64 -translate-y-1/2 flex-col gap-3 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 shadow-lg outline-none duration-100',
             'data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+            // En un teléfono no hay "a la derecha del modal": ese `left-[calc(50%+19rem)]` la dejaba
+            // fuera de la pantalla. Ahí ocupa el lugar del teclado — anclada abajo, a todo el ancho
+            // y subiendo desde el borde, que es de donde el usuario espera que salga un teclado.
+            'max-md:inset-x-0 max-md:top-auto max-md:bottom-0 max-md:left-0 max-md:w-full max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-2xl max-md:pb-[calc(1rem+env(safe-area-inset-bottom))]',
+            'max-md:data-open:zoom-in-100 max-md:data-open:slide-in-from-bottom max-md:data-closed:zoom-out-100 max-md:data-closed:slide-out-to-bottom',
           )}
         >
           <div className="flex items-center justify-between">
@@ -195,7 +211,8 @@ export function CalculatorDialog({
                 key={index}
                 type="button"
                 variant={keyVariant(key)}
-                className="h-11 text-sm"
+                // Más alta en móvil: ahí se toca con el pulgar y ocupa el lugar de un teclado.
+                className="h-11 text-sm max-md:h-14 max-md:text-base"
                 onClick={() => press(key)}
               >
                 {keyLabel(key)}
