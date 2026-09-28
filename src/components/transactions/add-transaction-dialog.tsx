@@ -375,8 +375,13 @@ export function AddTransactionDialog({
             la pestaña de la calculadora (hermana de ese wrapper, ver más abajo) pueda protruir
             fuera del modal en vez de que `overflow-y-auto` la recorte — en CSS, fijar `overflow-y`
             a algo distinto de `visible` fuerza también a `overflow-x` a recortar. */}
-        <DialogContent className="max-w-lg overflow-visible p-0">
-          <div className="flex max-h-[85vh] flex-col gap-4 overflow-y-auto p-4">
+        {/* `fullscreen`: en un teléfono este formulario es largo (monto, tipo, cuenta, categoría,
+            fecha, nota) y como hoja obligaba a desplazarse dentro de una ventana chica. Ocupando la
+            pantalla completa se lee como una página propia. De `md` en adelante no cambia nada. */}
+        <DialogContent mobileVariant="fullscreen" className="md:max-w-lg overflow-visible p-0">
+          {/* En móvil el wrapper toma todo el alto del modal y el scroll vive aquí adentro; en
+              escritorio conserva su tope de 85vh. */}
+          <div className="flex h-full max-h-none flex-col gap-4 overflow-y-auto p-4 md:h-auto md:max-h-[85vh]">
             <DialogHeader>
               <DialogTitle>{isEditMode ? 'Edit record' : 'Add record'}</DialogTitle>
             </DialogHeader>
@@ -583,7 +588,9 @@ export function AddTransactionDialog({
               </div>
             </div>
 
-            <DialogFooter className={isEditMode ? 'sm:justify-end' : 'sm:justify-between'}>
+            {/* `max-md:mt-auto`: a pantalla completa el formulario puede no llenar el alto, y sin
+                esto los botones quedarían flotando a media pantalla en vez de al pie. */}
+            <DialogFooter className={cn('max-md:mt-auto', isEditMode ? 'sm:justify-end' : 'sm:justify-between')}>
               {!isEditMode && (
                 <Button type="button" variant="ghost" onClick={resetFormState}>
                   Clear form
@@ -609,7 +616,9 @@ export function AddTransactionDialog({
             type="button"
             onClick={toggleCalculator}
             aria-label={calculatorOpen ? 'Close calculator' : 'Open calculator'}
-            className="absolute top-1/2 left-full z-[60] ml-2 flex h-14 w-6 -translate-y-1/2 items-center justify-center rounded-lg bg-muted text-muted-foreground ring-1 ring-foreground/10 hover:bg-muted/70"
+            // A pantalla completa no hay "fuera del modal": `left-full` dejaría la pestaña fuera de
+            // la pantalla, así que en móvil se ancla por dentro del borde derecho.
+            className="absolute top-1/2 left-full z-[60] ml-2 flex h-14 w-6 -translate-y-1/2 items-center justify-center rounded-lg bg-muted text-muted-foreground ring-1 ring-foreground/10 hover:bg-muted/70 max-md:right-2 max-md:left-auto max-md:ml-0"
           >
             <HugeiconsIcon icon={ArrowRight01Icon} className={cn('size-4 transition-transform', calculatorOpen && 'rotate-180')} />
           </button>

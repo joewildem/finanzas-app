@@ -14,6 +14,7 @@ import { DebtDetailPage } from '@/pages/debts/debt-detail-page'
 import { DebtsListPage } from '@/pages/debts/debts-list-page'
 import { InvestmentsPage } from '@/pages/investments/investments-page'
 import { LoginPage } from '@/pages/login-page'
+import { QuickAddPage } from '@/pages/transactions/quick-add-page'
 import { SavingsGoalDetailPage } from '@/pages/savings/savings-goal-detail-page'
 import { SavingsListPage } from '@/pages/savings/savings-list-page'
 import { SettingsLayout } from '@/pages/settings/settings-layout'
@@ -40,6 +41,8 @@ function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/accounts/:accountId" element={<DashboardAccountDetailPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
+          {/* Atajo de captura rápida: abre el modal de alta al entrar (ver QuickAddPage). */}
+          <Route path="/add" element={<QuickAddPage />} />
           <Route path="/subscriptions" element={<SubscriptionsPage />} />
           <Route path="/budget" element={<BudgetPage />} />
           <Route path="/savings">

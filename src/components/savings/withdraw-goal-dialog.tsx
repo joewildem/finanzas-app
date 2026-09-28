@@ -84,7 +84,7 @@ export function WithdrawGoalDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="md:max-w-lg">
         <DialogHeader>
           <DialogTitle>Withdraw from {goal.nombre}</DialogTitle>
         </DialogHeader>

@@ -109,7 +109,7 @@ export function AccountFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+      <DialogContent className="md:max-h-[85vh] md:max-w-lg md:overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {mode === 'create' ? 'Add account' : `Edit ${account?.nombre ?? ''}`}

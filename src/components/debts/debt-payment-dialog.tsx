@@ -97,7 +97,7 @@ export function DebtPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="md:max-w-lg">
         <DialogHeader>
           <DialogTitle>Register payment — {debt.nombre}</DialogTitle>
         </DialogHeader>
