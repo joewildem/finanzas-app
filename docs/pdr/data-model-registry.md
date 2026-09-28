@@ -19,7 +19,7 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |Contador|Último usado|Módulo de origen|
 |---|---|---|
 |Casos de uso (CU-XXX)|CU-084|ahorros-y-metas|
-|Reglas de negocio (RN-XXX)|RN-346|transacciones|
+|Reglas de negocio (RN-XXX)|RN-347|transacciones|
 |Errores de validación (VALIDATION_XXX)|VALIDATION_041|suscripciones|
 |Errores de autenticación/autorización (AUTH_XXX)|AUTH_003|auth|
 |Errores de lógica de negocio (BIZ_XXX)|BIZ_036|suscripciones|

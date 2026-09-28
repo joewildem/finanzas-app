@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { ArrowRight01Icon, Calculator01Icon, CancelCircleIcon, ChevronDownIcon, Note01Icon } from '@hugeicons/core-free-icons'
+import {
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  Calculator01Icon,
+  Cancel01Icon,
+  CancelCircleIcon,
+  ChevronDownIcon,
+  Note01Icon,
+} from '@hugeicons/core-free-icons'
 import { format } from 'date-fns'
 
 import { CurrencyInput } from '@/components/accounts/currency-input'
@@ -14,6 +22,7 @@ import { TransactionErrorAlert } from '@/components/transaction-error-alert'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -392,14 +401,50 @@ export function AddTransactionDialog({
         {/* `fullscreen`: en un teléfono este formulario es largo (monto, tipo, cuenta, categoría,
             fecha, nota) y como hoja obligaba a desplazarse dentro de una ventana chica. Ocupando la
             pantalla completa se lee como una página propia. De `md` en adelante no cambia nada. */}
-        <DialogContent mobileVariant="fullscreen" className="md:max-w-lg overflow-visible p-0">
+        {/* `showCloseButton={false}`: en móvil cerrar vive en la flecha del encabezado, y la X de
+            serie (esquina superior derecha) chocaría con el botón de la calculadora. En escritorio
+            se vuelve a poner abajo, igual que en cualquier otro diálogo. */}
+        <DialogContent
+          mobileVariant="fullscreen"
+          showCloseButton={false}
+          className="md:max-w-lg overflow-visible p-0"
+        >
+          <DialogClose
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Close"
+                className="absolute top-2 right-2 z-10 max-md:hidden"
+              />
+            }
+          >
+            <HugeiconsIcon icon={Cancel01Icon} />
+          </DialogClose>
           {/* En móvil el wrapper toma todo el alto del modal y el scroll vive aquí adentro; en
               escritorio conserva su tope de 85vh. */}
           <div className="flex h-full max-h-none flex-col gap-4 overflow-y-auto p-4 md:h-auto md:max-h-[85vh]">
-            {/* `pr-10` deja libre la esquina donde va la X del modal, para que el botón de la
-                calculadora no quede encima de ella. */}
-            <DialogHeader className="max-md:flex-row max-md:items-center max-md:justify-between max-md:pr-10">
-              <DialogTitle>{isEditMode ? 'Edit record' : 'Add record'}</DialogTitle>
+            {/* En móvil, barra de tres columnas: atrás · título · calculadora. La del centro es la
+                única que crece (`1fr`) y las laterales miden lo mismo —ambas son `icon-sm`—, así el
+                título queda centrado respecto a la pantalla y no respecto al espacio sobrante. En
+                escritorio vuelve a ser el encabezado de siempre: título solo, alineado a la
+                izquierda, con la X en su esquina. */}
+            <DialogHeader className="max-md:grid max-md:grid-cols-[auto_1fr_auto] max-md:items-center max-md:gap-2">
+              {/* Cerrar en móvil: una flecha de regreso, no una X — a pantalla completa esto se lee
+                  como una pantalla dentro de la app, y de una pantalla se regresa. */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => onOpenChange(false)}
+                aria-label="Close"
+                className="md:hidden"
+              >
+                <HugeiconsIcon icon={ArrowLeft01Icon} className="size-5" />
+              </Button>
+
+              <DialogTitle className="max-md:text-center">{isEditMode ? 'Edit record' : 'Add record'}</DialogTitle>
+
               {/* En móvil la calculadora se abre desde aquí; la pestaña del borde derecho no cabe
                   a pantalla completa (quedaría fuera de la pantalla). */}
               <Button
