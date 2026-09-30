@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import type { MsiPlan } from '@/lib/msi'
+import { useDataVersion } from '@/hooks/use-data-version'
 import { supabase } from '@/lib/supabase'
 
 interface MsiPlanRow {
@@ -54,9 +55,11 @@ export function useMsiPlans() {
     )
   }, [])
 
+  // RN-332 — ver useAccount: alimenta la misma pantalla y tiene que refrescarse con ella.
+  const dataVersion = useDataVersion()
   useEffect(() => {
     refetch()
-  }, [refetch])
+  }, [refetch, dataVersion])
 
   return { plans, error, refetch }
 }

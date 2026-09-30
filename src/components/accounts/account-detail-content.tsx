@@ -139,7 +139,7 @@ export function AccountDetailContent({ accountId }: { accountId: string | undefi
 
       {account.tipo === 'credito' && (
         <CreditCardMsiSection
-          accountId={account.id}
+          account={account}
           plans={accountMsiPlans}
           movements={movements}
           onChanged={() => {

@@ -4,6 +4,7 @@ import { CreditCardIcon, Wallet01Icon } from '@hugeicons/core-free-icons'
 import { AccountCardTile } from '@/components/accounts/account-card-tile'
 import { AccountCarousel } from '@/components/dashboard/account-carousel'
 import { CreditBalanceCard } from '@/components/dashboard/credit-balance-card'
+import { CreditCardsDueSummary } from '@/components/dashboard/credit-cards-due-summary'
 import {
   MonthlyStackedBarChartCard,
   type MonthlyChartPoint,
@@ -11,6 +12,7 @@ import {
 import { EmptyState } from '@/components/empty-state'
 import { useAccounts } from '@/hooks/use-accounts'
 import { useAccountsMonthlyBalance } from '@/hooks/use-accounts-monthly-balance'
+import { useCreditCardsDue } from '@/hooks/use-credit-cards-due'
 import { useCreditCardsMonthlySpendHistory } from '@/hooks/use-credit-cards-monthly-spend-history'
 import { formatCurrency } from '@/lib/accounts'
 import { computeNavigableYearRange, sortByBalanceDesc, sortDebitCashAccounts } from '@/lib/dashboard'
@@ -47,6 +49,7 @@ export function BalanceTab() {
 
   const { meses: mesesBalance } = useAccountsMonthlyBalance(anioBalance)
   const { meses: mesesCredito } = useCreditCardsMonthlySpendHistory(credito, anioCredito)
+  const { due } = useCreditCardsDue(credito)
 
   const balanceChartData: MonthlyChartPoint[] = (mesesBalance ?? []).map((point) => {
     const row: MonthlyChartPoint = { mes: point.mes }
@@ -96,9 +99,15 @@ export function BalanceTab() {
         />
       )}
 
-      <div className="flex flex-col gap-2">
-        <p className="text-base font-medium text-muted-foreground">Total credit cards</p>
-        <p className="font-mono text-2xl font-regular text-card-foreground">{formatCurrency(totalCreditCards)}</p>
+      {/* Dos lecturas distintas, juntas a propósito: lo que se DEBE (saldo, RN-241) y lo que hay
+          que PAGAR este mes (RN-350). Antes solo existía la primera, que no sirve para planear el
+          desembolso del mes. */}
+      <div className="flex flex-wrap gap-x-12 gap-y-4">
+        <div className="flex flex-col gap-2">
+          <p className="text-base font-medium text-muted-foreground">Total credit cards</p>
+          <p className="font-mono text-2xl font-regular text-card-foreground">{formatCurrency(totalCreditCards)}</p>
+        </div>
+        {due && <CreditCardsDueSummary aPagar={due.aPagar} acumulando={due.acumulando} />}
       </div>
 
       {credito.length === 0 ? (

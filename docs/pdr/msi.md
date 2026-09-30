@@ -252,9 +252,29 @@ tabla de amortización por plan con su avance acumulado.
   sumaría el monto de la compra: $10,000 a 12 meses da $833.33, y doce veces esa cifra son $9,999.96.
 - RN-277: Un plan corre durante los meses del intervalo `[msi_mes_inicio, msi_mes_inicio + meses)`.
   Fuera de él no aparece en ninguna vista mensual.
-- RN-278: El pago que corresponde a una tarjeta en un mes es la suma de sus compras corrientes de ese
-  mes más las parcialidades vigentes de sus planes. Las compras a meses **no** se cuentan por su monto
-  completo en el mes de la compra; entran repartidas en la columna de parcialidades.
+- RN-278 (_revisada 2026-10-01, ver RN-348_): El pago que corresponde a una tarjeta en un mes es la
+  suma de sus compras corrientes de ese mes más las parcialidades vigentes de sus planes. Las compras
+  a meses **no** se cuentan por su monto completo en el mes de la compra; entran repartidas en la
+  columna de parcialidades.
+- RN-348 (agregada 2026-10-01): una compra pertenece al mes en que **se paga**, no al mes natural en
+  que se hizo. El periodo de facturación al que cae se resuelve con `dia_corte` y vence en el primer
+  `dia_pago` posterior a ese corte: con corte el 16 y pago el 6, lo gastado entre el 16 de agosto y
+  el 15 de septiembre cierra el 16 de septiembre y se paga el 6 de octubre, así que se muestra en
+  **octubre**. No es "siempre el mes siguiente": eso solo se cumple cuando el día de pago cae antes
+  que el de corte. Con corte 5 y pago 25, el mismo periodo vence en su propio mes. Sin `dia_corte`
+  capturado se cae al mes natural, que es como funcionaba antes. Las parcialidades de MSI no se
+  recorren: `msi_mes_inicio` es el mes en que el usuario **paga** la primera (RN-274), así que ya
+  estaban en este mismo eje — el desfase era solo de la columna de compras.
+- RN-349 (agregada 2026-10-01): el calendario muestra además lo **abonado** y lo **pendiente** de
+  cada mes. Lo abonado no se captura aparte: sale de las transacciones `pago_tarjeta` de esa tarjeta,
+  y un abono salda el periodo cuya ventana de pago lo contiene — del corte a la víspera del corte
+  siguiente. Así, con corte el 16, cualquier pago entre el 16 de septiembre y el 15 de octubre salda
+  el periodo que vence el 6 de octubre, sea puntual o unos días tarde. Deliberadamente **no** se
+  reparten los abonos sobre saldos viejos sin cubrir: ver un pago hecho en octubre aterrizar en el
+  mes anterior sería impredecible para quien lo capturó. Es la diferencia con `msi_payments`
+  (RN-285), que sí se captura a mano porque un abono a la tarjeta no dice a qué **plan** pertenece;
+  a qué **corte** pertenece, en cambio, no es ambiguo. Un sobrepago deja el pendiente en cero, nunca
+  en negativo.
 - RN-279: El avance de un plan ("cargado") se deriva del calendario, no de los pagos capturados por el
   usuario: el banco carga la parcialidad al corte con independencia de que el estado de cuenta se
   haya liquidado o no.
@@ -571,6 +591,7 @@ retirada durante la construcción de este módulo.
 
 | Fecha | Cambio | CU afectado | Impacto en otros documentos |
 |---|---|---|---|
+| 2026-10-01 | El calendario de pagos deja de agrupar las compras por mes natural y pasa al mes en que **se pagan**, resuelto por el ciclo de corte de la tarjeta (RN-348); gana las columnas de abonado y pendiente, derivadas de las transacciones `pago_tarjeta` sin captura adicional (RN-349). Se revisa RN-278. El desfase se notaba en el uso diario: el usuario veía en septiembre un gasto que no le tocaba pagar hasta octubre, que es cuando efectivamente paga. Las parcialidades de MSI **no** cambian de mes — `msi_mes_inicio` ya era el mes de pago (RN-274), así que solo la columna de compras estaba en el eje equivocado. Sin cambios de esquema: todo sale de datos que ya se registraban. | CU-073 | [[dashboard]] adopta el mismo vocabulario de ciclo (RN-350, RN-351) y [[data-model-registry]] actualiza el índice hasta RN-351 |
 | 2026-09-04 | Documentación inicial del módulo, retroactiva a su construcción en código. Numeración CU-072 a CU-077, RN-270 a RN-289, `VALIDATION_038`/`VALIDATION_039`, `BIZ_034`/`BIZ_035`. | Todos | [[transacciones]], [[presupuesto]], [[cuentas]], [[data-model-registry]] |
 | 2026-09-04 | Registro del diseño descartado: la primera versión modelaba el plan como un `gasto` con metadata y una columna `budgets.msi_transaction_id`. Se sustituyó por el tipo `compra_msi` sin categoría al constatar que obligaba a excluir esas compras en las diez agregaciones de gasto existentes. | CU-072 | [[data-model-registry]] |
 

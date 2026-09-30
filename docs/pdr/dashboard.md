@@ -562,10 +562,26 @@ balance.
 **Reglas de negocio**
 
 - RN-238: La gráfica solo considera cuentas `tipo = credito`, `status = active`.
-- RN-239: El gasto de un mes de una tarjeta es la suma, en valor absoluto, de `transactions` con
-  `tipo = gasto` de esa cuenta dentro del mes calendario — cálculo derivado en tiempo de consulta, no
-  persistido. A diferencia de RN-230 (balance de cierre, acumulado), este es un total del mes en sí,
-  sin arrastre.
+- RN-239 (_revisada 2026-10-01_): El gasto de un mes de una tarjeta es la suma, en valor absoluto, de
+  `transactions` con `tipo = gasto` de esa cuenta dentro del **periodo de facturación que cierra en
+  ese mes** (RN-350) — antes era el mes calendario. Cálculo derivado en tiempo de consulta, no
+  persistido. A diferencia de RN-230 (balance de cierre, acumulado), este es un total del periodo en
+  sí, sin arrastre.
+- RN-350 (agregada 2026-10-01): el gasto de una tarjeta se agrupa por el mes en que **cierra** su
+  periodo de facturación, no por el mes natural. Con corte el 16, lo gastado del 16 de agosto al 15
+  de septiembre se muestra en **septiembre**, que es cuando se cortó. Es un eje distinto del de
+  RN-348 —donde ese mismo gasto aparece en octubre, que es cuando se paga— y la diferencia es
+  deliberada: una pantalla responde "¿cuánto gasté?" y la otra "¿cuánto tengo que pagar?". Por eso
+  cada una rotula su mes de forma explícita; el mismo dinero aparece bajo meses distintos y no debe
+  leerse como una contradicción. Sin `dia_corte` capturado se cae al mes natural.
+- RN-351 (agregada 2026-10-01): junto al total adeudado en tarjetas (RN-241) se muestra lo que hay
+  que **pagar**, que es otra pregunta: el total adeudado es el saldo, y esto es el desembolso del
+  mes. Se calcula por tarjeta como las compras que vencen ese mes (RN-348) más las parcialidades de
+  MSI que corren ese mes, menos lo ya abonado (RN-349), y se detalla por tarjeta al posar el cursor.
+  El mes mostrado **no es fijo**: es el primero que todavía tiene algo pendiente, de modo que al
+  liquidar las tarjetas el indicador avanza solo al siguiente sin que haya que marcar nada. Un
+  segundo bloque muestra el mes que se está acumulando y aún no toca pagar — el cálculo del ciclo en
+  curso de RN-237, que hasta ahora se calculaba sin mostrarse en ninguna parte.
 - RN-240: El año navegable está limitado al rango `[año de creación de la tarjeta de crédito activa
   más antigua del usuario, año en curso]` — mismo mecanismo que RN-232.
 
@@ -1625,6 +1641,7 @@ No introduce colección nueva — consulta agregada sobre `transactions` y `cate
 
 | Fecha | Cambio | CU afectado | Impacto en otros documentos |
 |---|---|---|---|
+| 2026-10-01 | La gráfica de uso mensual por tarjeta pasa a agrupar por el mes en que **cierra** el periodo de facturación, no por mes natural (RN-350, revisa RN-239) — la misma corrección que RN-236 ya había hecho para el indicador de ciclo y que RN-083 de [[reportes]] arrastraba. Se agrega junto a "Total credit cards" un indicador de lo que toca **pagar**, con desglose por tarjeta al posar el cursor (RN-351); su mes avanza solo conforme se liquidan las tarjetas, sin marcar nada a mano. Ese segundo bloque le da por fin presentación al cálculo del ciclo en curso de RN-237, que llevaba desde el 2026-09-06 calculándose sin mostrarse. Sin cambios de esquema. | CU-063, CU-064 | Comparte el vocabulario de ciclo con [[msi]] (RN-348, RN-349); [[data-model-registry]] actualiza el índice hasta RN-351 |
 | 2026-09-20 | Consecuencia del cambio de `transactions.fecha` a `date` (RN-337 a RN-339 de [[transacciones]]), sin reglas nuevas aquí. Se corrigen dos efectos que este módulo sufría: las cuatro consultas de Analytics filtraban el rango con `toISOString()`, que en México adelanta seis horas y **dejaba fuera los movimientos del día 1** de cada periodo; y las reconstrucciones "a la fecha" de Balance y Networth comparaban con `new Date(fecha)`, que corría un movimiento del día 1 al mes anterior. Ambas pasan a `formatDateParam`/`parseDate`. | CU-062, CU-065 a CU-071 | Ver [[transacciones]] y [[data-model-registry]] |
 | 2026-09-16 | Consecuencia de CU-084 de [[ahorros-y-metas]], sin cambios en las reglas de este documento: el saldo de las metas en Cash & Savings (RN-242) y en el histórico de Networth (CU-066) incluye ahora sus ajustes de saldo — rendimientos registrados sin cuenta —, porque ambos cálculos pasan a leer la vista `savings_goal_movements` (RN-335). La card Savings de Analytics **no** los incluye (RN-336): mide dinero movido por el usuario. | CU-065, CU-066 | Ver [[ahorros-y-metas]] y [[data-model-registry]] |
 | 2026-09-07 | Corrección de comportamiento detectada en uso real: el Dashboard mostraba cifras viejas hasta recargar la página cuando el usuario registraba un movimiento desde otra parte de la aplicación (RN-332). Ninguna de las tres pestañas se suscribía a cambios —a diferencia de Transacciones, Presupuesto, Ahorros y Deudas, que sí lo hacían, aunque solo para el alta desde el botón global y no para ediciones, borrados ni el resto de las escrituras—. Se agrega una señal global de invalidación emitida desde el cliente de Supabase (`src/lib/data-refresh.ts`), a la que se suscriben los hooks de lectura de las tres pestañas. **Sin cambios de esquema ni de cálculo.** | CU-061 a CU-071 | Se actualiza [[data-model-registry]]: índice de numeración hasta RN-332 |

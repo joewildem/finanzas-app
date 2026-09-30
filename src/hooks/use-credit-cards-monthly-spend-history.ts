@@ -3,6 +3,8 @@ import { endOfMonth, isAfter, parse } from 'date-fns'
 
 import { useDataVersion } from '@/hooks/use-data-version'
 import type { Account } from '@/lib/accounts'
+import { parseDate } from '@/lib/dates'
+import { statementMonthOf } from '@/lib/statements'
 import { supabase } from '@/lib/supabase'
 
 export interface CreditCardSpendPoint {
@@ -37,7 +39,9 @@ export function useCreditCardsMonthlySpendHistory(creditAccounts: Account[], ani
       return
     }
 
-    const yearStart = `${anio}-01-01`
+    // La ventana arranca un mes antes del año: con corte a mitad de mes, lo gastado en la segunda
+    // quincena de diciembre cierra en enero del año siguiente y tiene que entrar en esta consulta.
+    const yearStart = `${anio - 1}-12-01`
     const yearEndExclusive = `${anio + 1}-01-01`
     const { data, error: txError } = await supabase
       .from('transactions')
@@ -68,7 +72,15 @@ export function useCreditCardsMonthlySpendHistory(creditAccounts: Account[], ani
         const gasto = isAfter(createdAt, monthEnd)
           ? 0
           : txs
-              .filter((t) => t.account_id === account.id && t.fecha.slice(0, 7) === mes)
+              .filter(
+                (t) =>
+                  t.account_id === account.id &&
+                  // RN-349: el gasto pertenece al mes en que CIERRA su periodo de facturación, no al
+                  // mes natural en que se hizo. Sin día de corte capturado se cae al mes natural.
+                  (account.dia_corte == null
+                    ? t.fecha.slice(0, 7)
+                    : statementMonthOf(parseDate(t.fecha), account.dia_corte)) === mes,
+              )
               .reduce((sum, t) => sum + Math.abs(t.monto), 0)
 
         return { account_id: account.id, nombre: account.nombre, color: account.color, gasto }

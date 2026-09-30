@@ -8,7 +8,7 @@ import { SettleMsiPlanDialog } from '@/components/accounts/settle-msi-plan-dialo
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { formatCurrency, type AccountTransaction } from '@/lib/accounts'
+import { formatCurrency, type Account, type AccountTransaction } from '@/lib/accounts'
 import { currentMonthKey, monthKeyLabel } from '@/lib/budgets'
 import {
   computeChargedThrough,
@@ -16,6 +16,8 @@ import {
   computeInstallmentSchedule,
   type MsiPlan,
 } from '@/lib/msi'
+import { parseDate } from '@/lib/dates'
+import { paymentAppliesToMonth, paymentMonthOf } from '@/lib/statements'
 import { cn } from '@/lib/utils'
 
 function monthOf(fecha: string): string {
@@ -24,13 +26,37 @@ function monthOf(fecha: string): string {
 
 // Lo que hay que pagarle a la tarjeta en un mes: las compras del periodo (excluyendo las compras a
 // MSI, cuyo monto completo no se paga ese mes) más las mensualidades de los planes que corren ese
-// mes. Es el mismo desglose de dos columnas que el usuario llevaba a mano en su hoja de cálculo, y
-// cuadra con Presupuesto por construcción: ambos parten de la misma exclusión.
-function buildMonthlyStatement(movements: AccountTransaction[], plans: MsiPlan[], mes: string) {
+// mes. Es el mismo desglose que el usuario llevaba a mano en su hoja de cálculo, y cuadra con
+// Presupuesto por construcción: ambos parten de la misma exclusión.
+//
+// El mes de una compra es aquel en que SE PAGA, no aquel en que se hizo (RN-348): con corte el 16 y
+// pago el 6, lo gastado del 16 de agosto al 15 de septiembre cierra el 16 de septiembre y se paga el
+// 6 de octubre, así que pertenece a octubre. Antes se agrupaba por mes calendario y el usuario veía
+// en septiembre un gasto que no le tocaba pagar hasta octubre, que es justo cuando lo paga.
+function buildMonthlyStatement(
+  movements: AccountTransaction[],
+  plans: MsiPlan[],
+  mes: string,
+  ciclo: { diaCorte: number; diaPago: number } | null,
+) {
+  // Sin día de corte configurado no hay ciclo que respetar y se cae al mes calendario, que es como
+  // funcionaba antes — una tarjeta a medio capturar sigue mostrando algo razonable.
+  const mesDeCargo = (fecha: string) =>
+    ciclo ? paymentMonthOf(parseDate(fecha), ciclo.diaCorte, ciclo.diaPago) : monthOf(fecha)
+  const mesDeAbono = (fecha: string) =>
+    ciclo ? paymentAppliesToMonth(parseDate(fecha), ciclo.diaCorte, ciclo.diaPago) : monthOf(fecha)
+
   // Solo gastos corrientes: una `compra_msi` es su propio tipo, así que este filtro ya la deja fuera
   // — su monto no se paga en el mes de la compra, se paga en parcialidades.
   const compras = movements
-    .filter((m) => m.tipo === 'gasto' && monthOf(m.fecha) === mes)
+    .filter((m) => m.tipo === 'gasto' && mesDeCargo(m.fecha) === mes)
+    .reduce((sum, m) => sum + Math.abs(m.monto), 0)
+
+  // Lo ya abonado a ese corte. No se captura a mano: un pago a la tarjeta ya se registra como
+  // `pago_tarjeta` y no hay ambigüedad sobre a qué corte corresponde (a diferencia de un plan MSI,
+  // donde sí la hay y por eso existe `msi_payments`).
+  const pagado = movements
+    .filter((m) => m.tipo === 'pago_tarjeta' && mesDeAbono(m.fecha) === mes)
     .reduce((sum, m) => sum + Math.abs(m.monto), 0)
 
   // Se conserva el desglose por plan, no solo la suma: es lo que se muestra al pasar el cursor sobre
@@ -41,26 +67,37 @@ function buildMonthlyStatement(movements: AccountTransaction[], plans: MsiPlan[]
   })
   const mensualidades = desglose.reduce((sum, entry) => sum + entry.monto, 0)
 
+  const total = compras + mensualidades
   return {
     mes,
     compras,
     mensualidades,
     desglose,
-    total: compras + mensualidades,
+    total,
+    pagado,
+    // Un sobrepago no deja el pendiente en negativo: se muestra saldado y ya.
+    pendiente: Math.max(0, total - pagado),
   }
 }
 
 export function CreditCardMsiSection({
-  accountId,
+  account,
   plans,
   movements,
   onChanged,
 }: {
-  accountId: string
+  account: Account
   plans: MsiPlan[]
   movements: AccountTransaction[]
   onChanged: () => void
 }) {
+  const accountId = account.id
+  // Ambos días son obligatorios al capturar una tarjeta, pero el tipo los admite nulos porque la
+  // tabla `accounts` es compartida con débito y efectivo, donde no aplican.
+  const ciclo =
+    account.dia_corte != null && account.dia_pago != null
+      ? { diaCorte: account.dia_corte, diaPago: account.dia_pago }
+      : null
   const [openPlanId, setOpenPlanId] = useState<string | null>(null)
   const mesActual = currentMonthKey()
   const anioActual = Number(mesActual.slice(0, 4))
@@ -70,7 +107,9 @@ export function CreditCardMsiSection({
   // parcialidad pendiente — mismo criterio que la gráfica de balance mensual, que solo deja moverse
   // por años que tienen algo que mostrar (RN-232/RN-240).
   const mesesConDatos = [
-    ...movements.map((m) => monthOf(m.fecha)),
+    ...movements.map((m) =>
+      ciclo ? paymentMonthOf(parseDate(m.fecha), ciclo.diaCorte, ciclo.diaPago) : monthOf(m.fecha),
+    ),
     ...plans.flatMap((plan) => computeInstallmentSchedule(plan).map((cuota) => cuota.mes)),
   ]
   const anios = mesesConDatos.map((mes) => Number(mes.slice(0, 4)))
@@ -80,7 +119,7 @@ export function CreditCardMsiSection({
   // Los doce meses del año elegido, siempre completos — que un mes salga en ceros también es
   // información (ese mes no debes nada).
   const mesesDelAnio = Array.from({ length: 12 }, (_, i) =>
-    buildMonthlyStatement(movements, plans, `${anio}-${String(i + 1).padStart(2, '0')}`),
+    buildMonthlyStatement(movements, plans, `${anio}-${String(i + 1).padStart(2, '0')}`, ciclo),
   )
 
   const totalComprometido = plans.reduce((sum, plan) => {
@@ -107,8 +146,11 @@ export function CreditCardMsiSection({
     // calendario de pagos y el avance de los planes son lecturas distintas, cada una en su contenedor.
     // `items-start` evita que la más corta se estire para igualar a la otra.
     <TooltipProvider>
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        <Card>
+      {/* Misma rejilla de tres columnas que la card de Balance de arriba, para que el calendario de
+          pagos quede exactamente a su ancho (2 de 3) y los planes ocupen el tercio que allá queda
+          vacío. Con proporciones propias los bordes no coincidían con los de la sección anterior. */}
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
             <div>
               <CardTitle>Payment schedule</CardTitle>
@@ -147,6 +189,8 @@ export function CreditCardMsiSection({
                     <th className="py-2 text-right font-normal">Purchases</th>
                     <th className="py-2 text-right font-normal">Installments</th>
                     <th className="py-2 text-right font-normal">Total</th>
+                    <th className="py-2 text-right font-normal">Paid</th>
+                    <th className="py-2 text-right font-normal">Pending</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -196,6 +240,25 @@ export function CreditCardMsiSection({
                       </td>
                       <td className="py-2 text-right font-mono text-card-foreground">
                         {formatCurrency(entry.total)}
+                      </td>
+                      {/* Lo abonado sale de los propios movimientos de pago a la tarjeta, no de una
+                          captura aparte. En verde solo cuando ya no queda nada por pagar: el color
+                          responde a "¿está saldado?", no a "¿hubo un abono?". */}
+                      <td
+                        className={cn(
+                          'py-2 text-right font-mono',
+                          entry.total > 0 && entry.pendiente === 0 ? 'text-success' : 'text-muted-foreground',
+                        )}
+                      >
+                        {formatCurrency(entry.pagado)}
+                      </td>
+                      <td
+                        className={cn(
+                          'py-2 text-right font-mono',
+                          entry.pendiente > 0 ? 'text-card-foreground' : 'text-muted-foreground',
+                        )}
+                      >
+                        {formatCurrency(entry.pendiente)}
                       </td>
                     </tr>
                   ))}

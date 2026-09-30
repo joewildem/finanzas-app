@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import { useDataVersion } from '@/hooks/use-data-version'
 import { supabase } from '@/lib/supabase'
 import type { Account, AccountTransaction } from '@/lib/accounts'
 
@@ -36,9 +37,12 @@ export function useAccount(accountId: string | undefined) {
     setMovements((movementsResult.data as AccountTransaction[] | null) ?? [])
   }, [accountId])
 
+  // RN-332: vuelve a consultar ante cualquier escritura. Sin esto, registrar un pago a la tarjeta
+  // desde el botón global dejaba el calendario de pagos mostrando el estado anterior.
+  const dataVersion = useDataVersion()
   useEffect(() => {
     refetch()
-  }, [refetch])
+  }, [refetch, dataVersion])
 
   return { account, movements, error, refetch }
 }
