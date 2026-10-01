@@ -101,6 +101,9 @@ export function TransactionsPage() {
 
   // --- CU-035 — modo selección ---
 
+  // Un ajuste se edita y se elimina uno por uno (RN-357), pero sigue fuera de la selección
+  // múltiple: las acciones en lote cambian cuenta, fecha o nota de golpe, y mover un ajuste de
+  // cuenta tendría que trasladar saldo entre dos cuentas, que no es lo que esas acciones hacen.
   const selectableTransactions = (transactions ?? []).filter((t) => t.tipo !== 'ajuste')
   const allSelected = selectableTransactions.length > 0 && selectableTransactions.every((t) => selectedIds.has(t.id))
   const selectedList = (transactions ?? []).filter((t) => selectedIds.has(t.id))
@@ -359,10 +362,10 @@ export function TransactionsPage() {
                       {/* Ancho fijo también aquí: sin él, un monto largo empujaba la fecha de ese
                           renglón y las columnas dejaban de alinearse entre sí. */}
                       <MovementAmount monto={transaction.monto} className="w-28 text-right" />
-                      {/* El espacio de las acciones se reserva siempre: un ajuste no las lleva, y sin
-                          reservarlo su monto y su fecha quedaban corridos respecto a los demás. */}
+                      {/* El espacio de las acciones se reserva siempre para que el monto y la fecha
+                          queden alineados también en los renglones que no las muestran. */}
                       <div className="flex w-18 shrink-0 items-center justify-end gap-1">
-                        {!isAdjustment && !selectionMode && (
+                        {!selectionMode && (
                           <>
                             {!isMsiPurchase && (
                               <Button

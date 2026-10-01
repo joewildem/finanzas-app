@@ -61,7 +61,8 @@ export function useCreditCardsDue(creditAccounts: Account[]) {
     const { data, error: txError } = await supabase
       .from('transactions')
       .select('account_id, tipo, monto, fecha')
-      .in('tipo', ['gasto', 'pago_tarjeta'])
+      // RN-355: los ajustes cuentan aquí — son dinero cargado a la tarjeta, solo que sin categoría.
+      .in('tipo', ['gasto', 'ajuste', 'pago_tarjeta'])
       .in(
         'account_id',
         creditAccounts.map((a) => a.id),
@@ -88,10 +89,12 @@ export function useCreditCardsDue(creditAccounts: Account[]) {
         const compras = propias
           .filter(
             (t) =>
-              t.tipo === 'gasto' &&
+              (t.tipo === 'gasto' || t.tipo === 'ajuste') &&
               (ciclo ? paymentMonthOf(parseDate(t.fecha), ciclo.diaCorte, ciclo.diaPago) : t.fecha.slice(0, 7)) === mes,
           )
-          .reduce((sum, t) => sum + Math.abs(t.monto), 0)
+          // `-monto` y no `Math.abs`: un ajuste puede ir en cualquier dirección, y en valor
+          // absoluto una corrección a la baja sumaría deuda en vez de restarla.
+          .reduce((sum, t) => sum - t.monto, 0)
 
         const mensualidades = plans!
           .filter((plan) => plan.accountId === account.id)

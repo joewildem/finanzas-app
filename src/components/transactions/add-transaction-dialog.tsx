@@ -49,6 +49,7 @@ type MovementChip =
   | 'goal_contribution'
   | 'goal_withdrawal'
   | 'debt_payment'
+  | 'adjustment'
 
 const PRIMARY_CHIPS: { value: MovementChip; label: string }[] = [
   { value: 'expense', label: 'Expense' },
@@ -93,6 +94,10 @@ export function AddTransactionDialog({
 
   const [chip, setChip] = useState<MovementChip>('expense')
   const [showMore, setShowMore] = useState(false)
+  // Dirección del ajuste. Es el único chip donde el signo lo declara el usuario: en los demás lo
+  // fija el tipo de movimiento. "out" cubre tanto sacar dinero de una cuenta como aumentar la
+  // deuda de una tarjeta — en ambos casos es dinero que salió, que es lo que significa el signo.
+  const [adjustmentDirection, setAdjustmentDirection] = useState<'out' | 'in'>('out')
   const [calculatorOpen, setCalculatorOpen] = useState(false)
 
   const [amount, setAmount] = useState(0)
@@ -129,6 +134,7 @@ export function AddTransactionDialog({
     setToAccountId('')
     setFecha(new Date())
     setNota('')
+    setAdjustmentDirection('out')
     setSubmitError(null)
   }
 
@@ -155,13 +161,14 @@ export function AddTransactionDialog({
     else if (tx.tipo === 'aportacion_meta') derivedChip = 'goal_contribution'
     else if (tx.tipo === 'retiro_meta') derivedChip = 'goal_withdrawal'
     else if (tx.tipo === 'pago_deuda') derivedChip = 'debt_payment'
+    else if (tx.tipo === 'ajuste') derivedChip = 'adjustment'
     else {
       const groupEntry = (groups ?? []).find((entry) => entry.categories.some((c) => c.id === tx.category_id))
       derivedChip = groupEntry?.group.flujo === 'investment' ? 'investment' : 'expense'
     }
 
     setChip(derivedChip)
-    setShowMore(derivedChip === 'investment' || derivedChip === 'card_payment' || derivedChip === 'goal_contribution' || derivedChip === 'goal_withdrawal')
+    setShowMore(derivedChip === 'investment' || derivedChip === 'card_payment' || derivedChip === 'goal_contribution' || derivedChip === 'goal_withdrawal' || derivedChip === 'adjustment')
     setAmount(Math.abs(tx.monto))
     setCalcExpression(String(Math.abs(tx.monto)))
     setCategoryId(tx.category_id ?? '')
@@ -170,6 +177,7 @@ export function AddTransactionDialog({
     setInterestAmount(tx.monto_interes ?? 0)
     setFecha(parseDate(tx.fecha))
     setNota(tx.nota ?? '')
+    setAdjustmentDirection(tx.monto < 0 ? 'out' : 'in')
     setSubmitError(null)
 
     if (tx.tipo === 'transferencia' || tx.tipo === 'pago_tarjeta') {
@@ -277,6 +285,9 @@ export function AddTransactionDialog({
     const showsCategory = chip === 'expense' || chip === 'income' || chip === 'investment'
     const showsGoal = chip === 'goal_contribution' || chip === 'goal_withdrawal'
     const showsDebt = chip === 'debt_payment'
+    // Un ajuste es el único movimiento cuyo monto viaja con signo: la dirección la declara el
+    // usuario y puede invertirse al editar, mientras que en los demás tipos la fija `tipo`.
+    const montoFirmado = chip === 'adjustment' && adjustmentDirection === 'out' ? -amount : amount
 
 
     if (isEditMode && editingTransaction) {
@@ -301,7 +312,7 @@ export function AddTransactionDialog({
       setIsSubmitting(true)
       const { error } = await supabase.rpc('update_transaction', {
         p_transaction_id: editingTransaction.id,
-        p_monto: amount,
+        p_monto: montoFirmado,
         p_category_id: showsCategory ? categoryId : null,
         p_fecha: fechaStr,
         p_nota: nota || null,
@@ -358,6 +369,27 @@ export function AddTransactionDialog({
         p_cuenta_origen_id: fromAccountId,
         p_cuenta_destino_id: toAccountId,
         p_monto: amount,
+        p_fecha: fechaStr,
+        p_nota: nota || null,
+      })
+      setIsSubmitting(false)
+      if (error) {
+        setSubmitError(findTransactionErrorCodeInMessage(error.message) ?? 'SYS_001')
+        return
+      }
+      finishSubmit(seguirCapturando)
+      return
+    }
+
+    if (chip === 'adjustment') {
+      if (!accountId) {
+        setSubmitError('VALIDATION_001')
+        return
+      }
+      setIsSubmitting(true)
+      const { error } = await supabase.rpc('create_adjustment', {
+        p_account_id: accountId,
+        p_monto: montoFirmado,
         p_fecha: fechaStr,
         p_nota: nota || null,
       })
@@ -537,6 +569,25 @@ export function AddTransactionDialog({
                   </div>
                 )}
 
+                {/* En renglón aparte y no como cuarto chip de la fila anterior: con cuatro, "Card
+                    payment" y "Adjustment" se parten en dos líneas en el ancho de un teléfono. */}
+                {showMore && (
+                  <div className="flex items-center gap-1 rounded-full bg-muted p-1">
+                    <button
+                      type="button"
+                      disabled={isEditMode}
+                      onClick={() => selectChip('adjustment')}
+                      className={cn(
+                        'flex-1 rounded-full py-1.5 text-sm font-medium transition-colors',
+                        isEditMode && 'disabled:cursor-default',
+                        chip === 'adjustment' ? CHIP_ACTIVE_CLASS : CHIP_INACTIVE_CLASS,
+                      )}
+                    >
+                      Balance adjustment
+                    </button>
+                  </div>
+                )}
+
                 {/* "Withdraw from goal" ya no es un chip elegible al crear (CU-048 se abre desde un
                     botón dedicado en el contexto de la meta, con un modal restringido — ver
                     WithdrawGoalDialog). Solo se muestra aquí, sin interacción, como indicador de
@@ -628,6 +679,47 @@ export function AddTransactionDialog({
                       value={interestAmount}
                       onChange={(value) => setInterestAmount(value ?? 0)}
                     />
+                  </div>
+                </>
+              ) : chip === 'adjustment' ? (
+                <>
+                  <AccountPickerRow
+                    label="Account"
+                    accounts={accounts ?? []}
+                    accountId={accountId}
+                    onSelect={setAccountId}
+                    disabled={isEditMode}
+                  />
+                  {/* Sin selector de categoría, que es el punto entero de este tipo: un ajuste mueve
+                      el saldo sin cargarle el monto a ninguna categoría. En su lugar va la
+                      dirección, que aquí sí la declara el usuario. "Money out" cubre los dos casos
+                      —sacar dinero de una cuenta y aumentar la deuda de una tarjeta— porque en
+                      ambos es dinero que salió. */}
+                  <div className="flex flex-col gap-2">
+                    <Label>Direction</Label>
+                    <div className="flex items-center gap-1 rounded-full bg-muted p-1">
+                      {(
+                        [
+                          ['out', 'Money out'],
+                          ['in', 'Money in'],
+                        ] as const
+                      ).map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setAdjustmentDirection(value)}
+                          className={cn(
+                            'flex-1 rounded-full py-1.5 text-sm font-medium transition-colors',
+                            adjustmentDirection === value ? CHIP_ACTIVE_CLASS : CHIP_INACTIVE_CLASS,
+                          )}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      On a credit card, “Money out” increases what you owe.
+                    </p>
                   </div>
                 </>
               ) : (

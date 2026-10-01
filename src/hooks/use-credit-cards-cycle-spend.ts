@@ -33,7 +33,8 @@ export function useCreditCardsCycleSpend(creditAccounts: Account[]) {
     const { data, error: txError } = await supabase
       .from('transactions')
       .select('account_id, monto, fecha')
-      .eq('tipo', 'gasto')
+      // RN-355: los ajustes cuentan aquí — son dinero cargado a la tarjeta, solo que sin categoría.
+      .in('tipo', ['gasto', 'ajuste'])
       .in(
         'account_id',
         creditAccounts.map((a) => a.id),
@@ -59,7 +60,7 @@ export function useCreditCardsCycleSpend(creditAccounts: Account[]) {
             parseDate(t.fecha) >= cycle.from &&
             parseDate(t.fecha) < cycle.toExclusive,
         )
-        .reduce((sum, t) => sum + Math.abs(t.monto), 0)
+        .reduce((sum, t) => sum - t.monto, 0)
 
       result[account.id] = {
         ciclo_desde: formatDateParam(cycle.from),

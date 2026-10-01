@@ -1065,10 +1065,140 @@ Sin cambios — reutiliza los índices existentes.
 
 ---
 
+### CU-085 — Registrar un ajuste de saldo con fecha
+
+**Actor:** Usuario autenticado (dueño de los datos)
+
+**Descripción del caso de uso**
+
+Esta funcionalidad permite registrar, desde el alta de movimientos, un movimiento de dinero que
+mueve el saldo de una cuenta o tarjeta **sin pertenecer a ninguna categoría**: una corrección, un
+cargo que agrupa varios conceptos, o dinero que el usuario no puede ni quiere atribuir.
+
+El tipo `ajuste` ya existía para el ajuste de saldo de una cuenta (RN-015 de [[cuentas]]), pero solo
+se podía expresar como "cuál es el saldo correcto **hoy**". Eso no sirve para reconstruir el
+historial de una tarjeta mes a mes, que es el uso que lo originó: el usuario había capturado el
+saldo total de sus tarjetas como un ajuste único, lo revirtió a cero, y necesitaba volver a
+registrar los cargos en el mes que les corresponde. Sin fecha, la única salida era registrarlos como
+gastos de una categoría cualquiera, lo que inflaba esa categoría con dinero que no se gastó ahí.
+
+**Flujo principal**
+
+1. El usuario abre el alta de movimientos y elige el tipo "Balance adjustment".
+2. El sistema oculta el selector de categoría y presenta en su lugar el selector de dirección.
+3. El usuario captura monto, cuenta, dirección ("Money out" / "Money in"), fecha y nota opcional.
+4. El sistema registra una fila `tipo = ajuste` con `category_id` nulo y el monto con el signo que
+   corresponde a la dirección elegida.
+5. El sistema aplica el movimiento sobre `saldo_actual` de la cuenta, invirtiendo el signo si la
+   cuenta es de crédito (RN-049).
+
+**Flujos alternativos / casos borde**
+
+- Monto en cero: se rechaza. A diferencia del resto de los tipos, un monto negativo **sí** es válido
+  — es la forma de declarar la dirección.
+- Cuenta archivada: se rechaza, igual que cualquier otro movimiento.
+- La dirección puede invertirse al editar: un ajuste capturado como salida puede corregirse a
+  entrada sin eliminarlo y volver a capturarlo.
+
+**Precondiciones**
+
+- El usuario debe estar autenticado y la cuenta debe estar activa.
+
+**Postcondiciones**
+
+- Existe una fila en `transactions` con `tipo = ajuste` y `category_id` nulo.
+- `saldo_actual` de la cuenta refleja el movimiento.
+
+**Reglas de negocio**
+
+- RN-355 (agregada 2026-10-01): un ajuste **cuenta como dinero** y **nunca como categoría**. En
+  concreto: entra en el saldo de la cuenta, en el patrimonio, en el balance mensual, en el consumo
+  de la línea de crédito, en el calendario de pagos y en lo que toca pagar este mes (RN-351 de
+  [[dashboard]]); y queda fuera de Presupuesto, de Analytics y de todo reparto por categoría. Lo
+  primero exigió incluir `ajuste` en las cuatro consultas de tarjeta que filtraban `tipo = 'gasto'`
+  estricto, porque si no un cargo sin categoría corregía el saldo pero desaparecía de lo que hay que
+  pagar — justo el problema que el caso de uso venía a resolver. Lo segundo **no exigió nada**: las
+  doce agregaciones de categoría y gasto ya filtran `tipo in ('gasto','ingreso')`, así que `ajuste`
+  estaba fuera por construcción, igual que `compra_msi`. Esa es la razón de resolverlo con un
+  `tipo` propio y **no** con un campo `excluida` sobre un gasto: un booleano habría que recordarlo
+  en cada una de esas doce consultas, y basta olvidarlo en una para tener dos pantallas en
+  desacuerdo.
+- RN-356 (agregada 2026-10-01): `monto` de un ajuste es un **movimiento de dinero** —negativo sale,
+  positivo entra— igual que en todos los demás tipos, y el impacto sobre una cuenta de crédito se
+  invierte al aplicarlo (RN-049). Antes era la excepción: `adjust_account_balance` guardaba la
+  diferencia de saldo, ya en términos de deuda, y la reconstrucción de históricos cargaba con un
+  caso especial para dejarlo pasar sin invertir. La excepción se sostenía mientras los ajustes los
+  escribía una sola pantalla; con el usuario capturándolos a mano, la misma columna querría decir
+  dos cosas opuestas según quién escribió la fila. La migración voltea el signo de los ajustes ya
+  registrados en tarjetas de crédito y el caso especial desaparece.
+- RN-357 (agregada 2026-10-01): un ajuste se **edita y se elimina** como cualquier otro movimiento,
+  revirtiendo o recalculando el saldo. Deroga BIZ_015, que lo impedía: esa regla se sostenía mientras
+  el único ajuste posible venía de "edit balance", donde el usuario declaraba el saldo correcto y no
+  había monto que equivocar. Capturándolo a mano, un error de dedo es ordinario y dejarlo permanente
+  en el historial es peor que permitir la corrección. Sigue **fuera de las acciones en lote**
+  (CU-035): esas cambian cuenta, fecha o nota de golpe, y mover un ajuste de cuenta tendría que
+  trasladar saldo entre dos cuentas, que no es lo que hacen.
+
+**Validaciones**
+
+| Campo | Tipo | Reglas | Mitigación OWASP |
+|---|---|---|---|
+| `p_account_id` | uuid | Requerido; cuenta propia y activa | A01 — Verificar pertenencia al usuario |
+| `p_monto` | numeric(14,2) | Requerido; distinto de cero; admite negativo | A03 — Validar tipo y rango |
+| `p_fecha` | date | Opcional; si falta, `public.today_local()` (RN-338) | A03 — Validar formato |
+| `p_nota` | text | Opcional | A03 — Escapar al renderizar |
+
+**Mensajes de error**
+
+*Validación*
+- `VALIDATION_001`: "Completa los campos requeridos." *(reutilizado)*
+- `VALIDATION_012`: "El monto debe ser distinto de cero." *(reutilizado)*
+
+*Lógica de negocio*
+- `BIZ_010`: "La cuenta no existe o no está activa." *(reutilizado)*
+
+*Autenticación / autorización*
+- `AUTH_001`: "Tu sesión ha expirado. Inicia sesión nuevamente." *(reutilizado)*
+
+**Requerimientos técnicos backend**
+
+*Definición del servicio*
+
+| Método | Endpoint | Auth |
+|---|---|---|
+| POST | `/rest/v1/rpc/create_adjustment` | Bearer JWT |
+
+*Modelo de información*
+
+No introduce colección ni campo nuevo: `transactions.category_id` ya es nullable y `tipo` ya
+contemplaba `ajuste` desde el cierre del módulo (2026-07-30).
+
+**Matriz de pruebas**
+
+| # | Categoría | Escenario | Input | Resultado esperado | HTTP |
+|---|---|---|---|---|---|
+| 1 | Flujo exitoso | Ajuste de salida en tarjeta de crédito | `-2000`, fecha pasada | Fila `ajuste` sin categoría; la deuda sube 2000; aparece en el mes de pago que le corresponde | 200 |
+| 2 | Flujo exitoso | Ajuste de salida en cuenta de débito | `-500` | El saldo baja 500 | 200 |
+| 3 | Lógica de negocio | Ajuste de entrada en tarjeta | `1000` | La deuda baja 1000 | 200 |
+| 4 | Lógica de negocio | Editar invirtiendo la dirección | de `-3500` a `1000` | El saldo refleja la diferencia completa, no solo la magnitud | 200 |
+| 5 | Lógica de negocio | Eliminar un ajuste | — | El saldo vuelve al valor previo | 200 |
+| 6 | Lógica de negocio | Ajuste registrado en una tarjeta | — | No aparece en ninguna categoría de Analytics ni consume presupuesto (RN-355) | 200 |
+| 7 | Validación de entrada | Monto en cero | `0` | `VALIDATION_012` | 400 |
+| 8 | Lógica de negocio | Cuenta archivada | — | `BIZ_010` | 409 |
+| 9 | Autenticación / autorización | Token expirado o ausente | Sin JWT válido | `AUTH_001` | 401 |
+
+**Referencia de diseño**
+
+- Pantalla / flujo: alta de movimientos, chip "Balance adjustment" (sin referencia de Figma — el
+  tipo se agregó después del diseño original).
+
+---
+
 ## Historial de cambios
 
 | Fecha      | Cambio                                                                                                                                                                                                                                                                                                                                                                                 | CU afectado     | Impacto en otros documentos                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------
+| 2026-10-01 | Se agrega CU-085: un ajuste de saldo se puede registrar desde el alta de movimientos, con monto y fecha propios, sin categoría (RN-355). El tipo `ajuste` ya existía desde el cierre del módulo, pero solo se expresaba como "cuál es el saldo correcto hoy" (RN-015 de [[cuentas]]), y por eso las correcciones terminaban capturándose como gastos de una categoría cualquiera, que quedaba inflada con dinero que no se gastó ahí. Se resuelve con el tipo que ya existía y **no** con un campo `excluida` sobre un gasto: las doce agregaciones de categoría ya filtran `tipo in ('gasto','ingreso')`, así que la exclusión es estructural y no hay que recordarla en cada consulta — mismo criterio que `compra_msi`. Se unifica la convención de signo de `monto` en los ajustes de tarjeta, que era la única excepción de la tabla, y desaparece el caso especial de la reconstrucción de históricos (RN-356). Se deroga BIZ_015: un ajuste ya se edita y se elimina, aunque sigue fuera de las acciones en lote (RN-357). Sin cambios de esquema. | CU-085, CU-017, CU-018 | [[cuentas]] conserva RN-015 sin cambio (el ajuste por saldo total sigue existiendo); [[dashboard]] incluye los ajustes en consumo de línea y en lo que toca pagar (RN-351); [[data-model-registry]] actualiza el índice hasta CU-085 / RN-357 |
 | 2026-09-28 | Ajustes al alta en móvil sobre la entrega del mismo día, a partir de probarla en un teléfono real (RN-345, RN-346). El pie pasa a dos botones apilados —"Add record" y "Save and add another"— y pierde "Clear form" y "Cancel", que en un teléfono se resuelven recargando o cerrando; en escritorio el pie queda igual. La calculadora gana un botón en el encabezado y se presenta en el lugar del teclado: la pestaña del borde derecho, pensada para colgar fuera del modal, quedaba **fuera de la pantalla** a pantalla completa, así que en móvil no era accesible. "=" pasa a escribir el resultado en el monto sin cerrar. |
 | 2026-09-28 | Los modales se adaptan al teléfono (RN-342, RN-343) y se agrega la ruta de captura rápida `/add` (RN-344). Por debajo de `md` los 26 diálogos del sistema pasan de estar centrados a presentarse como hoja inferior, y el alta de movimientos pasa a pantalla completa. El corte es `md` (768px) y no `sm`: es el mismo donde la navegación ya cambiaba a barra inferior, de modo que "móvil" signifique una sola cosa en la aplicación. Lo móvil se expresa como diferencias `max-md:` sobre las clases de escritorio, que quedan intactas — al revés habría que reescribir el ancho y el alto declarados por cada diálogo, y `tailwind-merge` no resuelve todos esos pares. Sin cambios de esquema. |
 | 2026-09-20 | Corrección del rango personalizado del filtro de fechas (RN-341), detectada en uso real: el calendario se cerraba al primer clic y no dejaba elegir el periodo completo, y una misma fecha unas veces quedaba como inicio y otras como fin. La causa era delegar el armado del rango en `addToRange` de react-day-picker, cuyo primer clic ya devuelve un rango completo. Pasa a armarse en dos fases explícitas (`nextPickedRange` en `src/lib/date-periods.ts`, con pruebas de la secuencia de clics). Sin cambios de esquema. |

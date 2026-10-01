@@ -21,7 +21,8 @@ export function useCreditCardsMonthlySpend(accountIds: string[]) {
     const { data, error: txError } = await supabase
       .from('transactions')
       .select('account_id, monto')
-      .eq('tipo', 'gasto')
+      // RN-355: los ajustes cuentan aquí — son dinero cargado a la tarjeta, solo que sin categoría.
+      .in('tipo', ['gasto', 'ajuste'])
       .in('account_id', accountIds)
       .gte('fecha', range.from)
       .lt('fecha', range.toExclusive)
@@ -34,7 +35,7 @@ export function useCreditCardsMonthlySpend(accountIds: string[]) {
 
     const result: Record<string, number> = {}
     for (const tx of data as { account_id: string; monto: number }[]) {
-      result[tx.account_id] = (result[tx.account_id] ?? 0) + Math.abs(tx.monto)
+      result[tx.account_id] = (result[tx.account_id] ?? 0) - tx.monto
     }
     setSpendByAccount(result)
     // eslint-disable-next-line react-hooks/exhaustive-deps

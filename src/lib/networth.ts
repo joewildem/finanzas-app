@@ -110,20 +110,23 @@ function sumSignedUpTo(movimientos: { monto: number; fecha: string }[], cutoff: 
 
 // RN-040/RN-049 revisadas (2026-09-01, [[transacciones]]): en una cuenta `tipo = credito`,
 // `saldo_actual` es la deuda en positivo — el impacto de cada transacción se invierte respecto al
-// monto tal cual se almacena, salvo `ajuste` (su `monto` ya es el diff a aplicar directamente, sin
-// importar el tipo de cuenta). Esta reconstrucción "a la fecha" debe seguir la misma regla que ya
+// monto tal cual se almacena. Esta reconstrucción "a la fecha" debe seguir la misma regla que ya
 // aplican los RPCs sobre el saldo en vivo, o un histórico de una tarjeta de crédito no coincide con
 // su saldo actual.
+//
+// `ajuste` era la excepción: guardaba la diferencia de saldo, ya en términos de deuda, y había que
+// dejarlo pasar sin invertir. Desde RN-356 comparte la convención del resto de los tipos y la
+// excepción desapareció — con ella, el único lugar donde esta función necesitaba mirar el `tipo`.
 export function computeAccountBalanceAsOf(
   account: Pick<Account, 'saldo_inicial' | 'created_at' | 'tipo'>,
-  movimientos: { monto: number; fecha: string; tipo: string }[],
+  movimientos: { monto: number; fecha: string }[],
   cutoff: Date,
 ): number {
   if (isAfter(new Date(account.created_at), cutoff)) return 0
   const isCredito = account.tipo === 'credito'
   const delta = movimientos
     .filter((m) => !isAfter(parseDate(m.fecha), cutoff))
-    .reduce((sum, m) => sum + (isCredito && m.tipo !== 'ajuste' ? -m.monto : m.monto), 0)
+    .reduce((sum, m) => sum + (isCredito ? -m.monto : m.monto), 0)
   return account.saldo_inicial + delta
 }
 

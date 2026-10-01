@@ -46,7 +46,8 @@ export function useCreditCardsMonthlySpendHistory(creditAccounts: Account[], ani
     const { data, error: txError } = await supabase
       .from('transactions')
       .select('account_id, monto, fecha')
-      .eq('tipo', 'gasto')
+      // RN-355: los ajustes cuentan aquí — son dinero cargado a la tarjeta, solo que sin categoría.
+      .in('tipo', ['gasto', 'ajuste'])
       .in(
         'account_id',
         creditAccounts.map((a) => a.id),
@@ -81,7 +82,7 @@ export function useCreditCardsMonthlySpendHistory(creditAccounts: Account[], ani
                     ? t.fecha.slice(0, 7)
                     : statementMonthOf(parseDate(t.fecha), account.dia_corte)) === mes,
               )
-              .reduce((sum, t) => sum + Math.abs(t.monto), 0)
+              .reduce((sum, t) => sum - t.monto, 0)
 
         return { account_id: account.id, nombre: account.nombre, color: account.color, gasto }
       })

@@ -45,7 +45,8 @@ export function useCreditCardDetail(creditAccounts: Account[], accountId: string
     const { data, error: txError } = await supabase
       .from('transactions')
       .select('account_id, category_id, monto, fecha')
-      .eq('tipo', 'gasto')
+      // RN-355: los ajustes cuentan aquí — son dinero cargado a la tarjeta, solo que sin categoría.
+      .in('tipo', ['gasto', 'ajuste'])
       .in('account_id', accountIds)
       .gte('fecha', range.from)
       .lt('fecha', range.toExclusive)
@@ -79,12 +80,14 @@ export function useCreditCardDetail(creditAccounts: Account[], accountId: string
     const categoryTotals = new Map<string, number>()
 
     for (const tx of txs) {
-      const monto = Math.abs(tx.monto)
+      const monto = -tx.monto
       const key = bucketOf(tx.fecha)
       if (!seriesByAccount.has(tx.account_id)) seriesByAccount.set(tx.account_id, new Map())
       const accountBuckets = seriesByAccount.get(tx.account_id)!
       accountBuckets.set(key, (accountBuckets.get(key) ?? 0) + monto)
 
+      // Un ajuste llega con `category_id` nulo, así que queda fuera del top de categorías por
+      // construcción: cuenta como consumo de la tarjeta, nunca como gasto de una categoría.
       if (tx.category_id) {
         const nombre = categoryNameById.get(tx.category_id) ?? 'Other'
         categoryTotals.set(nombre, (categoryTotals.get(nombre) ?? 0) + monto)
