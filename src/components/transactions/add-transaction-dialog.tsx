@@ -569,8 +569,11 @@ export function AddTransactionDialog({
                   </div>
                 )}
 
-                {/* En renglón aparte y no como cuarto chip de la fila anterior: con cuatro, "Card
-                    payment" y "Adjustment" se parten en dos líneas en el ancho de un teléfono. */}
+                {/* "Free" = movimiento sin categoría: mueve el saldo como cualquier otro, pero no
+                    se clasifica y por lo tanto no aparece en Presupuesto ni en Analytics. No es
+                    solo una corrección de saldo — también cubre dinero que salió y que el usuario
+                    decidió no atribuir a nada. En renglón aparte y no como cuarto chip de la fila
+                    anterior: con cuatro, "Card payment" se parte en dos líneas en un teléfono. */}
                 {showMore && (
                   <div className="flex items-center gap-1 rounded-full bg-muted p-1">
                     <button
@@ -583,7 +586,7 @@ export function AddTransactionDialog({
                         chip === 'adjustment' ? CHIP_ACTIVE_CLASS : CHIP_INACTIVE_CLASS,
                       )}
                     >
-                      Balance adjustment
+                      Free
                     </button>
                   </div>
                 )}

@@ -1065,7 +1065,7 @@ Sin cambios — reutiliza los índices existentes.
 
 ---
 
-### CU-085 — Registrar un ajuste de saldo con fecha
+### CU-085 — Registrar un movimiento sin categoría
 
 **Actor:** Usuario autenticado (dueño de los datos)
 
@@ -1073,7 +1073,12 @@ Sin cambios — reutiliza los índices existentes.
 
 Esta funcionalidad permite registrar, desde el alta de movimientos, un movimiento de dinero que
 mueve el saldo de una cuenta o tarjeta **sin pertenecer a ninguna categoría**: una corrección, un
-cargo que agrupa varios conceptos, o dinero que el usuario no puede ni quiere atribuir.
+cargo que agrupa varios conceptos, o dinero que el usuario simplemente decidió no clasificar —
+regalar mil pesos a un familiar, por ejemplo, sin que eso ocupe un renglón de Presupuesto.
+
+No es solo una corrección de saldo, y por eso el tipo se presenta como **"Free"** y no como "Balance
+adjustment": lo que lo define es la ausencia de categoría, no el motivo. En el listado cada
+movimiento de estos se lee como "Uncategorized", con la nota del usuario debajo.
 
 El tipo `ajuste` ya existía para el ajuste de saldo de una cuenta (RN-015 de [[cuentas]]), pero solo
 se podía expresar como "cuál es el saldo correcto **hoy**". Eso no sirve para reconstruir el
@@ -1084,7 +1089,7 @@ gastos de una categoría cualquiera, lo que inflaba esa categoría con dinero qu
 
 **Flujo principal**
 
-1. El usuario abre el alta de movimientos y elige el tipo "Balance adjustment".
+1. El usuario abre el alta de movimientos y elige el tipo "Free".
 2. El sistema oculta el selector de categoría y presenta en su lugar el selector de dirección.
 3. El usuario captura monto, cuenta, dirección ("Money out" / "Money in"), fecha y nota opcional.
 4. El sistema registra una fila `tipo = ajuste` con `category_id` nulo y el monto con el signo que
@@ -1123,6 +1128,13 @@ gastos de una categoría cualquiera, lo que inflaba esa categoría con dinero qu
   `tipo` propio y **no** con un campo `excluida` sobre un gasto: un booleano habría que recordarlo
   en cada una de esas doce consultas, y basta olvidarlo en una para tener dos pantallas en
   desacuerdo.
+
+  **Analytics queda fuera también** (decisión explícita del usuario, 2026-10-01): sus totales se
+  construyen sobre `tipo in ('gasto','ingreso')` igual que Presupuesto, así que un movimiento sin
+  categoría no entra ni en el total de gastos ni en el flujo de efectivo. Se evaluó incluirlo solo
+  en los totales —no en el reparto por categoría, donde es imposible— y se descartó por ahora: el
+  total dejaría de cuadrar con la suma de sus categorías y habría que rotularlo en pantalla. La
+  lectura vigente es "gasto es lo que clasifiqué"; queda abierto revisarlo con uso real.
 - RN-356 (agregada 2026-10-01): `monto` de un ajuste es un **movimiento de dinero** —negativo sale,
   positivo entra— igual que en todos los demás tipos, y el impacto sobre una cuenta de crédito se
   invierte al aplicarlo (RN-049). Antes era la excepción: `adjust_account_balance` guardaba la
@@ -1189,8 +1201,8 @@ contemplaba `ajuste` desde el cierre del módulo (2026-07-30).
 
 **Referencia de diseño**
 
-- Pantalla / flujo: alta de movimientos, chip "Balance adjustment" (sin referencia de Figma — el
-  tipo se agregó después del diseño original).
+- Pantalla / flujo: alta de movimientos, chip "Free" (sin referencia de Figma — el tipo se agregó
+  después del diseño original).
 
 ---
 
@@ -1198,7 +1210,7 @@ contemplaba `ajuste` desde el cierre del módulo (2026-07-30).
 
 | Fecha      | Cambio                                                                                                                                                                                                                                                                                                                                                                                 | CU afectado     | Impacto en otros documentos                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------
-| 2026-10-01 | Se agrega CU-085: un ajuste de saldo se puede registrar desde el alta de movimientos, con monto y fecha propios, sin categoría (RN-355). El tipo `ajuste` ya existía desde el cierre del módulo, pero solo se expresaba como "cuál es el saldo correcto hoy" (RN-015 de [[cuentas]]), y por eso las correcciones terminaban capturándose como gastos de una categoría cualquiera, que quedaba inflada con dinero que no se gastó ahí. Se resuelve con el tipo que ya existía y **no** con un campo `excluida` sobre un gasto: las doce agregaciones de categoría ya filtran `tipo in ('gasto','ingreso')`, así que la exclusión es estructural y no hay que recordarla en cada consulta — mismo criterio que `compra_msi`. Se unifica la convención de signo de `monto` en los ajustes de tarjeta, que era la única excepción de la tabla, y desaparece el caso especial de la reconstrucción de históricos (RN-356). Se deroga BIZ_015: un ajuste ya se edita y se elimina, aunque sigue fuera de las acciones en lote (RN-357). Sin cambios de esquema. | CU-085, CU-017, CU-018 | [[cuentas]] conserva RN-015 sin cambio (el ajuste por saldo total sigue existiendo); [[dashboard]] incluye los ajustes en consumo de línea y en lo que toca pagar (RN-351); [[data-model-registry]] actualiza el índice hasta CU-085 / RN-357 |
+| 2026-10-01 | Se agrega CU-085: un movimiento sin categoría ("Free") se puede registrar desde el alta de movimientos, con monto y fecha propios, sin categoría (RN-355). El tipo `ajuste` ya existía desde el cierre del módulo, pero solo se expresaba como "cuál es el saldo correcto hoy" (RN-015 de [[cuentas]]), y por eso las correcciones terminaban capturándose como gastos de una categoría cualquiera, que quedaba inflada con dinero que no se gastó ahí. Se resuelve con el tipo que ya existía y **no** con un campo `excluida` sobre un gasto: las doce agregaciones de categoría ya filtran `tipo in ('gasto','ingreso')`, así que la exclusión es estructural y no hay que recordarla en cada consulta — mismo criterio que `compra_msi`. Se unifica la convención de signo de `monto` en los ajustes de tarjeta, que era la única excepción de la tabla, y desaparece el caso especial de la reconstrucción de históricos (RN-356). Se deroga BIZ_015: un ajuste ya se edita y se elimina, aunque sigue fuera de las acciones en lote (RN-357). Sin cambios de esquema. | CU-085, CU-017, CU-018 | [[cuentas]] conserva RN-015 sin cambio (el ajuste por saldo total sigue existiendo); [[dashboard]] incluye los ajustes en consumo de línea y en lo que toca pagar (RN-351); [[data-model-registry]] actualiza el índice hasta CU-085 / RN-357 |
 | 2026-09-28 | Ajustes al alta en móvil sobre la entrega del mismo día, a partir de probarla en un teléfono real (RN-345, RN-346). El pie pasa a dos botones apilados —"Add record" y "Save and add another"— y pierde "Clear form" y "Cancel", que en un teléfono se resuelven recargando o cerrando; en escritorio el pie queda igual. La calculadora gana un botón en el encabezado y se presenta en el lugar del teclado: la pestaña del borde derecho, pensada para colgar fuera del modal, quedaba **fuera de la pantalla** a pantalla completa, así que en móvil no era accesible. "=" pasa a escribir el resultado en el monto sin cerrar. |
 | 2026-09-28 | Los modales se adaptan al teléfono (RN-342, RN-343) y se agrega la ruta de captura rápida `/add` (RN-344). Por debajo de `md` los 26 diálogos del sistema pasan de estar centrados a presentarse como hoja inferior, y el alta de movimientos pasa a pantalla completa. El corte es `md` (768px) y no `sm`: es el mismo donde la navegación ya cambiaba a barra inferior, de modo que "móvil" signifique una sola cosa en la aplicación. Lo móvil se expresa como diferencias `max-md:` sobre las clases de escritorio, que quedan intactas — al revés habría que reescribir el ancho y el alto declarados por cada diálogo, y `tailwind-merge` no resuelve todos esos pares. Sin cambios de esquema. |
 | 2026-09-20 | Corrección del rango personalizado del filtro de fechas (RN-341), detectada en uso real: el calendario se cerraba al primer clic y no dejaba elegir el periodo completo, y una misma fecha unas veces quedaba como inicio y otras como fin. La causa era delegar el armado del rango en `addToRange` de react-day-picker, cuyo primer clic ya devuelve un rango completo. Pasa a armarse en dos fases explícitas (`nextPickedRange` en `src/lib/date-periods.ts`, con pruebas de la secuencia de clics). Sin cambios de esquema. |

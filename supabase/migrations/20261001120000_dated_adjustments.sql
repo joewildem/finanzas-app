@@ -27,12 +27,29 @@
 -- Esa excepción no se sostiene si el usuario captura ajustes a mano: la misma columna querría decir
 -- dos cosas opuestas según qué pantalla escribió la fila. Se unifica aquí, y el caso especial de
 -- `networth.ts` desaparece junto con ella.
-update public.transactions t
-set monto = -t.monto
-from public.accounts a
-where a.id = t.account_id
-  and t.tipo = 'ajuste'
-  and a.tipo = 'credito';
+--
+-- Guardia de idempotencia: voltear un signo dos veces lo deja como estaba, y una fila ya volteada
+-- no se distingue de una que no lo está — no hay forma de saberlo por el valor. Como estas
+-- migraciones se corren a mano en el SQL Editor, donde nada impide ejecutarlas de nuevo, el volteo
+-- se condiciona a que `create_adjustment` todavía no exista: esa función nace en esta misma
+-- migración, así que su ausencia es la prueba de que el volteo no ha corrido.
+do $$
+declare
+  v_filas int;
+begin
+  if to_regprocedure('public.create_adjustment(uuid,numeric,date,text)') is null then
+    update public.transactions t
+    set monto = -t.monto
+    from public.accounts a
+    where a.id = t.account_id
+      and t.tipo = 'ajuste'
+      and a.tipo = 'credito';
+    get diagnostics v_filas = row_count;
+    raise notice 'Convención de signo unificada en % ajuste(s) de tarjeta.', v_filas;
+  else
+    raise notice 'El volteo de signo ya se había aplicado — se omite.';
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- 2. create_adjustment
@@ -70,9 +87,13 @@ begin
     raise exception 'BIZ_010';
   end if;
 
+  -- Concepto distinto del "Ajuste manual" que escribe `adjust_account_balance`, aunque compartan
+  -- `tipo`: aquel corrige un saldo, este registra una salida o entrada que el usuario decidió no
+  -- clasificar. Es el texto que el listado muestra como nombre del movimiento, y la nota del
+  -- usuario queda debajo.
   insert into public.transactions (user_id, account_id, tipo, concepto, monto, nota, fecha)
   values (
-    auth.uid(), p_account_id, 'ajuste', 'Ajuste manual',
+    auth.uid(), p_account_id, 'ajuste', 'Uncategorized',
     p_monto, p_nota, coalesce(p_fecha, public.today_local())
   )
   returning * into v_transaction;
