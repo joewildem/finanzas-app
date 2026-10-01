@@ -271,7 +271,11 @@ existen datos.
   mes —la lectura saltaba— y además había que robarle alto al área de dibujo para que el mes más alto
   no quedara cortado. Un total en cero no imprime nada. La cifra exacta vive en el tooltip, que la
   muestra a dos decimales y con signo de moneda, incluido el `$0.00` de una cuenta sin movimiento en
-  ese mes: un `0` suelto no se distinguía del resto de los números de la lista.
+  ese mes: un `0` suelto no se distinguía del resto de los números de la lista. El tooltip cierra con
+  el **total del mes**, separado del desglose por una línea para que no se lea como una serie más: es
+  donde se consulta la cifra exacta detrás del `$34.5K` abreviado del eje. Ese total suma los
+  renglones que el propio tooltip muestra y no los datos del punto, de modo que no pueda discrepar de
+  lo que se está leyendo.
 - RN-230: El balance de una cuenta al cierre de un mes se calcula como
   `saldo_inicial + Σ(transactions.monto con signo, fecha ≤ último día del mes)` — cálculo derivado en
   tiempo de consulta, no persistido, mismo patrón que `disponible` en [[cuentas]].

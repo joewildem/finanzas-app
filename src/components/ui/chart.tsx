@@ -126,6 +126,7 @@ function ChartTooltipContent({
   labelClassName,
   formatter,
   valueFormatter,
+  totalLabel,
   color,
   nameKey,
   labelKey,
@@ -138,6 +139,12 @@ function ChartTooltipContent({
     labelKey?: string
     /** Formatea solo la cifra del renglon, dejando el resto del tooltip intacto. */
     valueFormatter?: (value: number) => string
+    /**
+     * Agrega al pie un renglon con la suma de las series del punto, bajo esta etiqueta. Es opt-in:
+     * solo tiene sentido donde las series se apilan y el total significa algo — en una grafica de
+     * lineas o de proporciones, sumarlas no significa nada.
+     */
+    totalLabel?: string
   } & Omit<
     RechartsPrimitive.DefaultTooltipContentProps<
       TooltipValueType,
@@ -189,6 +196,15 @@ function ChartTooltipContent({
 
   const nestLabel = payload.length === 1 && indicator !== "dot"
 
+  const visibleItems = payload.filter((item) => item.type !== "none")
+  // El total suma exactamente los renglones que el tooltip muestra, no los datos del punto: si una
+  // serie esta oculta, su cifra tampoco esta arriba y el total no cuadraria con lo que se lee.
+  const total = visibleItems.reduce(
+    (sum, item) => sum + (typeof item.value === "number" ? item.value : 0),
+    0
+  )
+  const formatValue = valueFormatter ?? ((value: number) => value.toLocaleString())
+
   return (
     <div
       className={cn(
@@ -198,8 +214,7 @@ function ChartTooltipContent({
     >
       {!nestLabel ? tooltipLabel : null}
       <div className="grid gap-1.5">
-        {payload
-          .filter((item) => item.type !== "none")
+        {visibleItems
           .map((item, index) => {
             const key = `${nameKey ?? item.name ?? item.dataKey ?? "value"}`
             const itemConfig = getPayloadConfigFromPayload(config, item, key)
@@ -243,7 +258,10 @@ function ChartTooltipContent({
                     )}
                     <div
                       className={cn(
-                        "flex flex-1 justify-between leading-none",
+                        // `gap-4`: con `justify-between` el nombre y la cifra solo se separan
+                        // mientras sobre ancho, y en cuanto un nombre largo llena el renglón
+                        // quedaban pegados y se leían como una sola cadena.
+                        "flex flex-1 justify-between gap-4 leading-none",
                         nestLabel ? "items-end" : "items-center"
                       )}
                     >
@@ -256,9 +274,7 @@ function ChartTooltipContent({
                       {item.value != null && (
                         <span className="font-mono font-medium text-foreground tabular-nums">
                           {typeof item.value === "number"
-                            ? (valueFormatter ?? ((value: number) => value.toLocaleString()))(
-                                item.value
-                              )
+                            ? formatValue(item.value)
                             : String(item.value)}
                         </span>
                       )}
@@ -269,6 +285,16 @@ function ChartTooltipContent({
             )
           })}
       </div>
+      {/* El total va separado del desglose por un espacio y una linea: pegado al ultimo renglon se
+          leia como una serie mas, que es justo lo que no es. */}
+      {totalLabel && (
+        <div className="mt-1 flex items-center justify-between gap-4 border-t border-border/50 pt-2.5">
+          <span className="font-medium text-foreground">{totalLabel}</span>
+          <span className="font-mono font-medium text-foreground tabular-nums">
+            {formatValue(total)}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

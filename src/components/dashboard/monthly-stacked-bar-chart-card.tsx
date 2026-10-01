@@ -152,7 +152,7 @@ export function MonthlyStackedBarChartCard({
               {/* El tooltip es el lugar de la cifra exacta: aquí sí a dos decimales y con signo de
                   moneda, incluido el `$0.00` de una cuenta sin movimiento ese mes — un "0" suelto no
                   se distinguía de cualquier otro número de la lista. */}
-              <ChartTooltip content={<ChartTooltipContent valueFormatter={formatCurrency} />} />
+              <ChartTooltip content={<ChartTooltipContent valueFormatter={formatCurrency} totalLabel="Total" />} />
               {series.map((s) => (
                 <Bar key={s.id} dataKey={s.id} stackId="stack" fill={`var(--color-${s.id})`} />
               ))}
