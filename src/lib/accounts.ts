@@ -62,6 +62,20 @@ export function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
+// Forma abreviada ("$94.5K", "$1.2M", "$850") para etiquetas que van dentro de una gráfica, donde
+// el ancho disponible lo reparten doce meses y la cifra completa a dos decimales no cabe ni se
+// alcanza a leer. **No se usa en ninguna cifra de lectura directa** —cards, totales, tablas,
+// historiales—: ahí la precisión es el punto y va `formatCurrency`. El detalle exacto de una barra
+// sigue estando en su tooltip.
+export function formatCurrencyCompact(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(amount)
+}
+
 // Igual que `formatCurrency` pero con el signo siempre explícito ("+$4,100.00" / "-$890.00"). Se usa
 // en el historial de movimientos, donde el signo es la información principal de la fila: distingue de
 // un vistazo lo que entró de lo que salió. El cero no lleva signo.
