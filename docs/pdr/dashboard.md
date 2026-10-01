@@ -398,8 +398,24 @@ _No aplica — este CU no captura datos, solo consulta información existente._
 **Reglas de negocio**
 
 - RN-233: El resumen solo incluye cuentas `tipo = credito` y `status = active`.
-- RN-234: El porcentaje utilizado se calcula como `abs(saldo_actual) ÷ linea_credito`; el disponible
-  reutiliza el cálculo ya definido en [[cuentas]] (RN-013).
+- RN-234 (_revisada 2026-10-01, ver RN-352_): El porcentaje utilizado se calcula como
+  `abs(saldo_actual) ÷ linea_credito`; el disponible reutiliza el cálculo ya definido en [[cuentas]]
+  (RN-013).
+- RN-352 (agregada 2026-10-01): en la card de tarjeta de crédito (CU-063) el porcentaje utilizado se
+  muestra **sin decimales**, redondeado al entero más cercano. Es una excepción deliberada al formato
+  general de la plataforma, que da un decimal a todo porcentaje salvo cuando termina en `.0` (ver el
+  historial del 2026-08-26): aquí el dato se lee de vistazo —"voy como en la mitad"— y el decimal
+  solo alarga el renglón, que comparte con el disponible. La excepción vale únicamente para este
+  indicador; donde un porcentaje se compara contra un objetivo, como en [[inversiones]], se conserva
+  la precisión de `formatPercent`.
+  La barra que acompaña al porcentaje se colorea por nivel de uso, para que el nivel se lea sin tener
+  que fijarse en el número: hasta 40% el color de marca, de 40% a 80% ámbar, y de 80% en adelante
+  rojo — el punto donde queda poco margen y una compra grande ya no entra. Los cortes son de la
+  propia tarjeta y no tienen relación con los del buró de crédito. El rojo es un token nuevo,
+  `--color-alert`, y **no** `--destructive`: ese último significa "acción destructiva" y no "métrica
+  en riesgo", y en modo oscuro está aclarado hasta leerse coral. Como los tres colores van sobre el
+  fondo propio de la card (imagen o degradado) y no sobre el del tema, el token es fijo en ambos
+  modos, mismo criterio que `--color-brand`.
 - RN-235: Orden de las cards: `saldo_actual` de mayor a menor (mismo campo y criterio numérico que
   RN-227 de débito/efectivo — como el saldo de una tarjeta de crédito es negativo, esto prioriza la
   tarjeta con menor deuda). Mismo criterio de carrusel que RN-228.
@@ -1641,6 +1657,7 @@ No introduce colección nueva — consulta agregada sobre `transactions` y `cate
 
 | Fecha | Cambio | CU afectado | Impacto en otros documentos |
 |---|---|---|---|
+| 2026-10-01 | El porcentaje de utilización de la card de tarjeta pasa a mostrarse sin decimales, y la barra que lo acompaña se colorea por nivel de uso con un token de rojo propio para indicadores en riesgo (RN-352, revisa RN-234). Es la primera excepción explícita al formato de porcentajes de toda la plataforma, acotada a este indicador. En la misma revisión, el badge "Excluded" de las cards de débito/efectivo (CU-061) pasa a posición absoluta: como hermano de la columna de nombre y saldo los empujaba unos píxeles hacia abajo, y una cuenta con badge quedaba desalineada frente a las demás del carrusel — es el mismo criterio de RN-237, que una card mida igual tenga o no el dato opcional. Sin cambios de esquema. | CU-061, CU-063 | [[data-model-registry]] actualiza el índice hasta RN-352 |
 | 2026-10-01 | La gráfica de uso mensual por tarjeta pasa a agrupar por el mes en que **cierra** el periodo de facturación, no por mes natural (RN-350, revisa RN-239) — la misma corrección que RN-236 ya había hecho para el indicador de ciclo y que RN-083 de [[reportes]] arrastraba. Se agrega junto a "Total credit cards" un indicador de lo que toca **pagar**, con desglose por tarjeta al posar el cursor (RN-351); su mes avanza solo conforme se liquidan las tarjetas, sin marcar nada a mano. Ese segundo bloque le da por fin presentación al cálculo del ciclo en curso de RN-237, que llevaba desde el 2026-09-06 calculándose sin mostrarse. Sin cambios de esquema. | CU-063, CU-064 | Comparte el vocabulario de ciclo con [[msi]] (RN-348, RN-349); [[data-model-registry]] actualiza el índice hasta RN-351 |
 | 2026-09-20 | Consecuencia del cambio de `transactions.fecha` a `date` (RN-337 a RN-339 de [[transacciones]]), sin reglas nuevas aquí. Se corrigen dos efectos que este módulo sufría: las cuatro consultas de Analytics filtraban el rango con `toISOString()`, que en México adelanta seis horas y **dejaba fuera los movimientos del día 1** de cada periodo; y las reconstrucciones "a la fecha" de Balance y Networth comparaban con `new Date(fecha)`, que corría un movimiento del día 1 al mes anterior. Ambas pasan a `formatDateParam`/`parseDate`. | CU-062, CU-065 a CU-071 | Ver [[transacciones]] y [[data-model-registry]] |
 | 2026-09-16 | Consecuencia de CU-084 de [[ahorros-y-metas]], sin cambios en las reglas de este documento: el saldo de las metas en Cash & Savings (RN-242) y en el histórico de Networth (CU-066) incluye ahora sus ajustes de saldo — rendimientos registrados sin cuenta —, porque ambos cálculos pasan a leer la vista `savings_goal_movements` (RN-335). La card Savings de Analytics **no** los incluye (RN-336): mide dinero movido por el usuario. | CU-065, CU-066 | Ver [[ahorros-y-metas]] y [[data-model-registry]] |
