@@ -46,11 +46,16 @@ function buildMonthlyStatement(
   const mesDeAbono = (fecha: string) =>
     ciclo ? paymentAppliesToMonth(parseDate(fecha), ciclo.diaCorte, ciclo.diaPago) : monthOf(fecha)
 
-  // Solo gastos corrientes: una `compra_msi` es su propio tipo, así que este filtro ya la deja fuera
-  // — su monto no se paga en el mes de la compra, se paga en parcialidades.
+  // Gastos corrientes y movimientos sin categoría (RN-355): ambos son dinero cargado a la tarjeta
+  // que hay que pagar en su corte, y lo único que los distingue es si se clasificó o no. Una
+  // `compra_msi` es su propio tipo, así que este filtro ya la deja fuera — su monto no se paga en
+  // el mes de la compra, se paga en parcialidades.
+  //
+  // `-monto` y no `Math.abs`: un movimiento sin categoría puede ir en cualquier dirección, y en
+  // valor absoluto una corrección a la baja sumaría deuda en vez de restarla.
   const compras = movements
-    .filter((m) => m.tipo === 'gasto' && mesDeCargo(m.fecha) === mes)
-    .reduce((sum, m) => sum + Math.abs(m.monto), 0)
+    .filter((m) => (m.tipo === 'gasto' || m.tipo === 'ajuste') && mesDeCargo(m.fecha) === mes)
+    .reduce((sum, m) => sum - m.monto, 0)
 
   // Lo ya abonado a ese corte. No se captura a mano: un pago a la tarjeta ya se registra como
   // `pago_tarjeta` y no hay ambigüedad sobre a qué corte corresponde (a diferencia de un plan MSI,

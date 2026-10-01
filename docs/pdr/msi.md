@@ -265,6 +265,12 @@ tabla de amortización por plan con su avance acumulado.
   capturado se cae al mes natural, que es como funcionaba antes. Las parcialidades de MSI no se
   recorren: `msi_mes_inicio` es el mes en que el usuario **paga** la primera (RN-274), así que ya
   estaban en este mismo eje — el desfase era solo de la columna de compras.
+
+  La columna de compras incluye tanto los gastos corrientes como los **movimientos sin categoría**
+  (RN-355 de [[transacciones]]): ambos son dinero cargado a la tarjeta que hay que pagar en su
+  corte, y lo único que los distingue es si se clasificó o no. Dejarlos fuera hacía que capturar la
+  deuda de una tarjeta como un solo movimiento sin categoría —el caso que motivó ese tipo— moviera
+  el saldo pero no apareciera en el mes que toca pagarlo.
 - RN-349 (agregada 2026-10-01): el calendario muestra además lo **abonado** y lo **pendiente** de
   cada mes. Lo abonado no se captura aparte: sale de las transacciones `pago_tarjeta` de esa tarjeta,
   y un abono salda el periodo cuya ventana de pago lo contiene — del corte a la víspera del corte
@@ -591,6 +597,7 @@ retirada durante la construcción de este módulo.
 
 | Fecha | Cambio | CU afectado | Impacto en otros documentos |
 |---|---|---|---|
+| 2026-10-01 | Corrección detectada en uso real el mismo día de la entrega: el calendario de pagos no contaba los movimientos sin categoría en su columna de compras, aunque RN-355 ya lo exigía. El total de un mes quedaba en cero pese a tener la deuda capturada, y solo aparecían las parcialidades de MSI. La causa es que este cálculo filtra sobre los movimientos ya cargados en memoria (`buildMonthlyStatement`) y no con una consulta, así que no apareció al revisar las consultas que filtraban `tipo = 'gasto'`. Se suma `-monto` en vez del valor absoluto, para que un movimiento sin categoría en sentido contrario reste en lugar de sumar. Sin cambios de esquema ni de reglas — RN-355 ya describía el comportamiento correcto. | CU-073 | Ninguno — corrige código contra RN-355 de [[transacciones]], que no cambia |
 | 2026-10-01 | El calendario de pagos deja de agrupar las compras por mes natural y pasa al mes en que **se pagan**, resuelto por el ciclo de corte de la tarjeta (RN-348); gana las columnas de abonado y pendiente, derivadas de las transacciones `pago_tarjeta` sin captura adicional (RN-349). Se revisa RN-278. El desfase se notaba en el uso diario: el usuario veía en septiembre un gasto que no le tocaba pagar hasta octubre, que es cuando efectivamente paga. Las parcialidades de MSI **no** cambian de mes — `msi_mes_inicio` ya era el mes de pago (RN-274), así que solo la columna de compras estaba en el eje equivocado. Sin cambios de esquema: todo sale de datos que ya se registraban. | CU-073 | [[dashboard]] adopta el mismo vocabulario de ciclo (RN-350, RN-351) y [[data-model-registry]] actualiza el índice hasta RN-351 |
 | 2026-09-04 | Documentación inicial del módulo, retroactiva a su construcción en código. Numeración CU-072 a CU-077, RN-270 a RN-289, `VALIDATION_038`/`VALIDATION_039`, `BIZ_034`/`BIZ_035`. | Todos | [[transacciones]], [[presupuesto]], [[cuentas]], [[data-model-registry]] |
 | 2026-09-04 | Registro del diseño descartado: la primera versión modelaba el plan como un `gasto` con metadata y una columna `budgets.msi_transaction_id`. Se sustituyó por el tipo `compra_msi` sin categoría al constatar que obligaba a excluir esas compras en las diez agregaciones de gasto existentes. | CU-072 | [[data-model-registry]] |
