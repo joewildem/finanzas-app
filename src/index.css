@@ -18,6 +18,11 @@
     /* Color de marca (Figma: `lime/10` bg, `lime/12` texto) — fijo, no varía entre light/dark. */
     --color-brand: #b0e64c;
     --color-brand-foreground: #37401c;
+    /* Rojo de alerta para indicadores: una métrica en zona de riesgo, no una acción destructiva.
+       `--destructive` no sirve aquí: en oscuro está aclarado a #ff6467 para contrastar sobre negro
+       y se lee coral, no rojo. Este es fijo en ambos modos, mismo criterio que --color-brand,
+       porque va sobre fondos propios (imagen o degradado de la tarjeta) y no sobre el del tema. */
+    --color-alert: #dc3545;
     /* Azul de acento del input "hero" de monto (CurrencyInput variant="hero", modal de
        transacciones) — fijo, no varía entre light/dark, mismo criterio que --color-brand.
        `-muted` es el tono más claro usado en el prefijo "$". */

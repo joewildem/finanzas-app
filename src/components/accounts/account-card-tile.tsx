@@ -39,8 +39,10 @@ export function AccountCardTile({ account }: { account: Account }) {
       />
 
       <div className="relative flex h-full flex-col p-4">
+        {/* Absoluto y fuera del flujo: como hermano de la columna empujaba hacia abajo el nombre y
+            el saldo, y una cuenta con badge quedaba desalineada frente a las demás del carrusel. */}
         {hasBadges && (
-          <div className="flex flex-col items-end gap-1 self-end">
+          <div className="absolute top-4 right-4 flex flex-col items-end gap-1">
             {account.excluir_de_stats && (
               <Badge variant="secondary" className="bg-white/15 text-white">
                 Excluded

@@ -1,7 +1,22 @@
 import { Link } from 'react-router-dom'
 
 import { ACCOUNT_IMAGE_ASPECT_CLASS, computeAvailableCredit, formatCurrency, type Account } from '@/lib/accounts'
-import { formatPercent } from '@/lib/utils'
+
+// El color de la barra responde a qué tanto de la línea se lleva usado, para que el nivel se lea
+// sin tener que fijarse en el número. Los cortes son los de la propia tarjeta, no los del buró:
+// hasta 40% va holgado; de ahí al 80% conviene mirarlo; arriba de 80% queda poco margen y es
+// donde una compra grande ya no entra. Se usan tokens del tema y no colores sueltos, para que
+// sigan al modo claro/oscuro como el resto de la app. El rojo es `--color-alert` y no
+// `--destructive`: ese último se aclara en modo oscuro hasta verse coral, además de significar
+// "acción destructiva" y no "métrica en riesgo".
+const UTILIZACION_MEDIA = 0.4
+const UTILIZACION_ALTA = 0.8
+
+function utilizationBarClass(porcentajeUtilizado: number): string {
+  if (porcentajeUtilizado >= UTILIZACION_ALTA) return 'bg-alert'
+  if (porcentajeUtilizado >= UTILIZACION_MEDIA) return 'bg-warning'
+  return 'bg-brand'
+}
 
 // CU-063 — mismo shell visual que AccountCardTile (imagen de fondo o degradado por color, scrim
 // para legibilidad) y misma estructura de contenido: nombre y saldo centrados, un renglón anclado
@@ -49,12 +64,16 @@ export function CreditBalanceCard({ account }: { account: Account }) {
         <div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
             <div
-              className="h-full rounded-full bg-destructive"
+              className={`h-full rounded-full ${utilizationBarClass(porcentajeUtilizado)}`}
               style={{ width: `${Math.min(porcentajeUtilizado, 1) * 100}%` }}
             />
           </div>
-          <div className="mt-1 flex items-center justify-between text-[10px] text-white/70">
-            <span>{formatPercent(porcentajeUtilizado * 100)} used</span>
+          {/* Porcentaje sin decimales, a diferencia del resto del sistema (`formatPercent`, un
+              decimal): en una card el dato es de vistazo —"voy como en la mitad"— y el decimal solo
+              alarga el renglón. Donde el porcentaje sí se compara contra un objetivo, como en
+              Inversiones, se conserva la precisión. */}
+          <div className="mt-1 flex items-center justify-between text-[11px] text-white/70">
+            <span>{Math.round(porcentajeUtilizado * 100)}% used</span>
             <span>{formatCurrency(disponible)} available</span>
           </div>
         </div>
