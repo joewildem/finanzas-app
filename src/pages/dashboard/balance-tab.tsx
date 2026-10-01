@@ -56,7 +56,13 @@ export function BalanceTab() {
     for (const cuenta of point.cuentas) row[cuenta.account_id] = cuenta.balance ?? 0
     return row
   })
-  const balanceChartSeries = debitoEfectivo.map((a) => ({ id: a.id, label: a.nombre, color: a.color }))
+  // Misma exclusión que el balance total (RN-225): una cuenta marcada `excluir_de_stats` no aporta
+  // su bloque a la barra ni su monto al total del mes. Antes la gráfica las dibujaba todas, así que
+  // el total del año no cuadraba con el balance total de arriba y no había forma de saber por qué.
+  // No aplica a tarjetas de crédito, que no tienen concepto de exclusión (RN-241).
+  const balanceChartSeries = debitoEfectivo
+    .filter((a) => !a.excluir_de_stats)
+    .map((a) => ({ id: a.id, label: a.nombre, color: a.color }))
 
   const creditChartData: MonthlyChartPoint[] = (mesesCredito ?? []).map((point) => {
     const row: MonthlyChartPoint = { mes: point.mes }

@@ -252,8 +252,26 @@ existen datos.
 
 **Reglas de negocio**
 
-- RN-229: La gráfica solo considera cuentas `tipo = debito` y `tipo = efectivo`, `status = active` —
-  las cuentas `tipo = credito` quedan fuera de este cálculo.
+- RN-229 (_revisada 2026-10-01, ver RN-353_): La gráfica solo considera cuentas `tipo = debito` y
+  `tipo = efectivo`, `status = active` y `excluir_de_stats = false` — las cuentas `tipo = credito`
+  quedan fuera de este cálculo.
+- RN-353 (agregada 2026-10-01): una cuenta marcada `excluir_de_stats` no aporta su bloque a la barra
+  del mes ni su monto al total — mismo criterio que el balance total de RN-225, con el que esta
+  gráfica tiene que cuadrar. Antes la gráfica dibujaba todas las cuentas activas, así que el total de
+  un mes no coincidía con el balance total de la misma pantalla y nada explicaba la diferencia. Es
+  deliberadamente distinto de RN-226: las **cards** sí muestran las cuentas excluidas, porque ahí el
+  dato es el saldo de cada cuenta por separado y el badge "Excluded" dice en qué consiste la
+  exclusión. La regla no aplica a la gráfica de uso de tarjetas (CU-064): el crédito no tiene
+  concepto de exclusión (RN-241).
+- RN-354 (agregada 2026-10-01): cada mes de las gráficas de barras apiladas (CU-062 y CU-064) muestra
+  su **total** bajo la etiqueta del mes, en el propio eje horizontal. Va abreviado (`$34.5K`) porque
+  doce meses no dejan ancho para la cifra completa; es la única excepción al formato de montos de la
+  plataforma, que son siempre a dos decimales, y vale solo para etiquetas dentro de una gráfica. El
+  total se ancla al eje y no a la cima de cada barra: colgado de la barra cambiaba de altura en cada
+  mes —la lectura saltaba— y además había que robarle alto al área de dibujo para que el mes más alto
+  no quedara cortado. Un total en cero no imprime nada. La cifra exacta vive en el tooltip, que la
+  muestra a dos decimales y con signo de moneda, incluido el `$0.00` de una cuenta sin movimiento en
+  ese mes: un `0` suelto no se distinguía del resto de los números de la lista.
 - RN-230: El balance de una cuenta al cierre de un mes se calcula como
   `saldo_inicial + Σ(transactions.monto con signo, fecha ≤ último día del mes)` — cálculo derivado en
   tiempo de consulta, no persistido, mismo patrón que `disponible` en [[cuentas]].
@@ -338,9 +356,11 @@ Reutiliza `(account_id, fecha desc)` de `transactions` (definido en [[transaccio
 | 2 | Lógica de negocio | Cuenta creada a mitad de año | — | Meses anteriores a la creación en `0` | 200 |
 | 3 | Lógica de negocio | Mes sin movimientos | — | Balance arrastrado del mes anterior (RN-231) | 200 |
 | 4 | Lógica de negocio | Año fuera del rango navegable | `anio=2019` | Se ignora / no se ofrece en el selector (RN-232) | 200 |
-| 5 | Validación de entrada | `anio` con formato inválido | `anio=abc` | `VALIDATION_020` | 400 |
-| 6 | Autenticación / autorización | Token expirado o ausente | Sin JWT válido | `AUTH_001` | 401 |
-| 7 | Error del sistema | Falla de base de datos | Simulado | `SYS_001` | 500 |
+| 5 | Lógica de negocio | Cuenta marcada `excluir_de_stats` | — | No aporta bloque ni monto al total del mes; el total de la gráfica cuadra con el balance total (RN-353) | 200 |
+| 6 | Lógica de negocio | Todas las cuentas débito/efectivo excluidas | — | La gráfica queda sin series y se muestra el estado vacío | 200 |
+| 7 | Validación de entrada | `anio` con formato inválido | `anio=abc` | `VALIDATION_020` | 400 |
+| 8 | Autenticación / autorización | Token expirado o ausente | Sin JWT válido | `AUTH_001` | 401 |
+| 9 | Error del sistema | Falla de base de datos | Simulado | `SYS_001` | 500 |
 
 **Referencia de diseño**
 
@@ -1657,6 +1677,7 @@ No introduce colección nueva — consulta agregada sobre `transactions` y `cate
 
 | Fecha | Cambio | CU afectado | Impacto en otros documentos |
 |---|---|---|---|
+| 2026-10-01 | La gráfica de balance mensual pasa a respetar `excluir_de_stats`, que hasta ahora ignoraba: una cuenta excluida ya no aporta bloque ni monto (RN-353, revisa RN-229). El síntoma era que el total de un mes no cuadraba con el balance total de la misma pantalla, que sí descuenta las excluidas desde RN-225. Las cards no cambian — ahí las excluidas se siguen mostrando con su badge (RN-226). Ambas gráficas de barras apiladas ganan el total de cada mes bajo la etiqueta del mes, abreviado, y su tooltip pasa a mostrar los montos con signo de moneda y dos decimales (RN-354). Sin cambios de esquema. | CU-062, CU-064 | [[data-model-registry]] actualiza el índice hasta RN-354 |
 | 2026-10-01 | El porcentaje de utilización de la card de tarjeta pasa a mostrarse sin decimales, y la barra que lo acompaña se colorea por nivel de uso con un token de rojo propio para indicadores en riesgo (RN-352, revisa RN-234). Es la primera excepción explícita al formato de porcentajes de toda la plataforma, acotada a este indicador. En la misma revisión, el badge "Excluded" de las cards de débito/efectivo (CU-061) pasa a posición absoluta: como hermano de la columna de nombre y saldo los empujaba unos píxeles hacia abajo, y una cuenta con badge quedaba desalineada frente a las demás del carrusel — es el mismo criterio de RN-237, que una card mida igual tenga o no el dato opcional. Sin cambios de esquema. | CU-061, CU-063 | [[data-model-registry]] actualiza el índice hasta RN-352 |
 | 2026-10-01 | La gráfica de uso mensual por tarjeta pasa a agrupar por el mes en que **cierra** el periodo de facturación, no por mes natural (RN-350, revisa RN-239) — la misma corrección que RN-236 ya había hecho para el indicador de ciclo y que RN-083 de [[reportes]] arrastraba. Se agrega junto a "Total credit cards" un indicador de lo que toca **pagar**, con desglose por tarjeta al posar el cursor (RN-351); su mes avanza solo conforme se liquidan las tarjetas, sin marcar nada a mano. Ese segundo bloque le da por fin presentación al cálculo del ciclo en curso de RN-237, que llevaba desde el 2026-09-06 calculándose sin mostrarse. Sin cambios de esquema. | CU-063, CU-064 | Comparte el vocabulario de ciclo con [[msi]] (RN-348, RN-349); [[data-model-registry]] actualiza el índice hasta RN-351 |
 | 2026-09-20 | Consecuencia del cambio de `transactions.fecha` a `date` (RN-337 a RN-339 de [[transacciones]]), sin reglas nuevas aquí. Se corrigen dos efectos que este módulo sufría: las cuatro consultas de Analytics filtraban el rango con `toISOString()`, que en México adelanta seis horas y **dejaba fuera los movimientos del día 1** de cada periodo; y las reconstrucciones "a la fecha" de Balance y Networth comparaban con `new Date(fecha)`, que corría un movimiento del día 1 al mes anterior. Ambas pasan a `formatDateParam`/`parseDate`. | CU-062, CU-065 a CU-071 | Ver [[transacciones]] y [[data-model-registry]] |

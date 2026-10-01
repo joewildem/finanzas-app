@@ -19,7 +19,7 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |Contador|Último usado|Módulo de origen|
 |---|---|---|
 |Casos de uso (CU-XXX)|CU-084|ahorros-y-metas|
-|Reglas de negocio (RN-XXX)|RN-352|dashboard|
+|Reglas de negocio (RN-XXX)|RN-354|dashboard|
 |Errores de validación (VALIDATION_XXX)|VALIDATION_041|suscripciones|
 |Errores de autenticación/autorización (AUTH_XXX)|AUTH_003|auth|
 |Errores de lógica de negocio (BIZ_XXX)|BIZ_036|suscripciones|
@@ -846,6 +846,7 @@ _(ninguno por ahora. Si un módulo nuevo contradice una definición previa de un
 |2026-09-20|transacciones|`transactions.fecha` y `savings_goal_adjustments.fecha` pasan de `timestamptz` a `date` (RN-337 a RN-340 de [[transacciones]]). Guardaban el día que el usuario elige dentro de una columna de instantes: el día viajaba suelto, Postgres lo fijaba a medianoche UTC y la pantalla lo devolvía a hora de México, un día antes. Se agrega la función `public.today_local()` —único lugar donde vive la zona horaria— y once funciones cambian `p_fecha` de `timestamptz` a `date`, lo que obliga a dar de baja su firma anterior para no dejar sobrecargas vivas. La vista `savings_goal_movements` se recrea con `fecha` como `date`. Las filas existentes **no** se corrigen (decisión del usuario): se convierten al día que ya mostraba la pantalla. Índice de numeración hasta RN-340.|
 |2026-10-01|msi, dashboard|El gasto de una tarjeta de crédito deja de agruparse por mes natural y pasa a hacerlo por su ciclo de corte, en dos ejes distintos y deliberados: el calendario de pagos usa el mes en que **se paga** (RN-348) y la gráfica de uso mensual el mes en que **cierra** el periodo (RN-350, revisa RN-239). El calendario gana columnas de abonado y pendiente derivadas de las transacciones `pago_tarjeta`, sin captura adicional (RN-349), y el Dashboard un indicador de lo que toca pagar con desglose por tarjeta (RN-351). **Sin cambios de esquema**: todo se deriva de datos que ya se registraban, incluidos `accounts.dia_corte` y `accounts.dia_pago`, obligatorios en toda tarjeta desde [[cuentas]]. El vocabulario común vive en `src/lib/statements.ts`. Índice de numeración hasta RN-351.|
 |2026-10-01|dashboard|El porcentaje de utilización de la card de tarjeta de crédito se muestra sin decimales y su barra se colorea por nivel de uso —marca, ámbar y rojo en 40% y 80%— con un token nuevo `--color-alert` para indicadores en riesgo, distinto de `--destructive` (RN-352, revisa RN-234). Primera excepción explícita al formato de porcentajes de la plataforma, acotada a ese indicador. El badge "Excluded" de las cards de débito/efectivo pasa a posición absoluta para que toda card mida igual. **Sin cambios de esquema.** Índice de numeración hasta RN-352.|
+|2026-10-01|dashboard|La gráfica de balance mensual respeta `excluir_de_stats`, igual que el balance total de RN-225 (RN-353, revisa RN-229); las cards siguen mostrando las cuentas excluidas con su badge (RN-226), que es una lectura distinta. Las gráficas de barras apiladas muestran el total de cada mes en el eje horizontal, abreviado, y sus tooltips los montos a dos decimales con signo de moneda (RN-354). **Sin cambios de esquema.** Índice de numeración hasta RN-354.|
 
 ---
 
