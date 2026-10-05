@@ -23,7 +23,10 @@ import { supabase } from '@/lib/supabase'
 // solo aporta su propio "chrome" alrededor de este componente.
 export function AccountDetailContent({ accountId }: { accountId: string | undefined }) {
   const { account, movements, refetch } = useAccount(accountId)
-  const { plans: msiPlans, refetch: refetchMsiPlans } = useMsiPlans()
+  // Incluye las de tarjetas archivadas (RN-359): esta pantalla está acotada a una cuenta, y si el
+  // usuario navegó a una archivada es justamente para ver lo que tiene. Donde se esconden es en las
+  // vistas que agregan varias tarjetas — Presupuesto y el indicador de pago del Dashboard.
+  const { plans: msiPlans, refetch: refetchMsiPlans } = useMsiPlans({ includeArchivedAccounts: true })
   const [editOpen, setEditOpen] = useState(false)
 
   if (account === undefined) {

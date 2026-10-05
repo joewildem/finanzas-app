@@ -478,8 +478,8 @@ sistema no puede derivarlo.
 **Flujo principal**
 
 1. El usuario abre el presupuesto de un mes.
-2. En el grupo "Installments (MSI)" ve un renglón por cada plan vigente ese mes, con la mensualidad
-   fija y el campo de pago editable.
+2. En el grupo "Installments (MSI)" ve un renglón por cada plan vigente ese mes **de una tarjeta
+   activa** (RN-359), con la mensualidad fija y el campo de pago editable.
 3. Captura el monto pagado; el sistema lo guarda de inmediato.
 
 **Flujos alternativos / casos borde**
@@ -495,6 +495,20 @@ sistema no puede derivarlo.
 
 **Reglas de negocio**
 
+- RN-359 (agregada 2026-10-04): los planes de una tarjeta **archivada** no aparecen en ninguna vista
+  que agregue varias tarjetas: ni en el grupo "Installments (MSI)" de Presupuesto, ni en el cálculo
+  de dinero por repartir (RN-287), ni en el indicador de lo que toca pagar (RN-351 de
+  [[dashboard]]). Archivar una tarjeta la retira de la operación diaria, y sus parcialidades no
+  tienen por qué seguir ocupando un renglón presupuestable.
+
+  El caso que lo destapó: renombrar una tarjeta agregándole "Deprecated" y archivarla para volver a
+  crearla con el nombre original —`accounts` tiene unicidad de nombre por usuario— dejaba las dos
+  en juego, y cada plan aparecía **duplicado** en Presupuesto, inflando el total del grupo al doble.
+
+  La **pantalla de detalle de una cuenta sí los muestra**, aunque la tarjeta esté archivada: está
+  acotada a una sola cuenta y el usuario llegó ahí a propósito; esconderlos ahí haría parecer que
+  los datos se perdieron. Es la misma distinción que ya aplica a las cards del Dashboard, que
+  tampoco listan cuentas archivadas mientras su detalle sigue siendo accesible.
 - RN-285: El pago de una parcialidad se captura a mano y se almacena en `msi_payments`, con unicidad
   por usuario, plan y mes. No se guarda en `budgets` porque ahí `monto` significa "lo que planeo
   asignar" y alimenta el cálculo de dinero por repartir; un pago ya ocurrido no es eso, y colocarlo
@@ -597,6 +611,7 @@ retirada durante la construcción de este módulo.
 
 | Fecha | Cambio | CU afectado | Impacto en otros documentos |
 |---|---|---|---|
+| 2026-10-04 | Los planes de una tarjeta archivada dejan de aparecer en las vistas que agregan varias tarjetas: Presupuesto, el dinero por repartir y el indicador de pago del Dashboard (RN-359). Detectado en uso real — el usuario renombró dos tarjetas a "… Deprecated" y las archivó para recrearlas con el nombre original, y cada plan quedó duplicado en el grupo "Installments (MSI)", con el total del grupo al doble. El detalle de una cuenta **sí** los sigue mostrando, incluso archivada, porque está acotado a esa tarjeta. El filtro se aplica en el cliente y no con un `accounts!inner` en la consulta: un error de sintaxis en un recurso embebido de PostgREST no falla, deja pasar todo, y el síntoma sería idéntico al que se corrige. Sin cambios de esquema. | CU-074 | [[presupuesto]] y [[dashboard]] heredan el filtro sin cambios propios; [[data-model-registry]] actualiza el índice hasta RN-359 |
 | 2026-10-01 | Corrección detectada en uso real el mismo día de la entrega: el calendario de pagos no contaba los movimientos sin categoría en su columna de compras, aunque RN-355 ya lo exigía. El total de un mes quedaba en cero pese a tener la deuda capturada, y solo aparecían las parcialidades de MSI. La causa es que este cálculo filtra sobre los movimientos ya cargados en memoria (`buildMonthlyStatement`) y no con una consulta, así que no apareció al revisar las consultas que filtraban `tipo = 'gasto'`. Se suma `-monto` en vez del valor absoluto, para que un movimiento sin categoría en sentido contrario reste en lugar de sumar. Sin cambios de esquema ni de reglas — RN-355 ya describía el comportamiento correcto. | CU-073 | Ninguno — corrige código contra RN-355 de [[transacciones]], que no cambia |
 | 2026-10-01 | El calendario de pagos deja de agrupar las compras por mes natural y pasa al mes en que **se pagan**, resuelto por el ciclo de corte de la tarjeta (RN-348); gana las columnas de abonado y pendiente, derivadas de las transacciones `pago_tarjeta` sin captura adicional (RN-349). Se revisa RN-278. El desfase se notaba en el uso diario: el usuario veía en septiembre un gasto que no le tocaba pagar hasta octubre, que es cuando efectivamente paga. Las parcialidades de MSI **no** cambian de mes — `msi_mes_inicio` ya era el mes de pago (RN-274), así que solo la columna de compras estaba en el eje equivocado. Sin cambios de esquema: todo sale de datos que ya se registraban. | CU-073 | [[dashboard]] adopta el mismo vocabulario de ciclo (RN-350, RN-351) y [[data-model-registry]] actualiza el índice hasta RN-351 |
 | 2026-09-04 | Documentación inicial del módulo, retroactiva a su construcción en código. Numeración CU-072 a CU-077, RN-270 a RN-289, `VALIDATION_038`/`VALIDATION_039`, `BIZ_034`/`BIZ_035`. | Todos | [[transacciones]], [[presupuesto]], [[cuentas]], [[data-model-registry]] |
