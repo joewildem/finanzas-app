@@ -1345,10 +1345,11 @@ una con un indicador de crecimiento o caída respecto al periodo anterior equiva
 - RN-258: Expenses = Σ `abs(transactions.monto)` con `tipo = gasto` cuya categoría pertenece a un
   grupo con `flujo = outflow`, dentro del rango del periodo seleccionado. Los grupos con
   `flujo = investment` quedan fuera — tienen su propia card (RN-260), sin traslape.
-- RN-259 (_nota agregada 2026-10-04_): aquí los retiros **sí** restan, a diferencia del renglón de
-  una meta en Presupuesto, que desde RN-358 de [[ahorros-y-metas]] solo cuenta aportaciones. Esta
-  card mide cuánto se ahorró en el periodo —un neto— y aquella mide cumplimiento de un plan; el
-  mismo retiro aparece en una y no en la otra a propósito.
+- RN-259 (_revisada 2026-10-04, ver RN-358 de [[ahorros-y-metas]]_): la card mide **cuánto se
+  apartó** para ahorro en el periodo, no el neto del ahorro, así que suma únicamente
+  `aportacion_meta`; los retiros no restan. Sacar dinero de una meta suele ser temporal, y restarlo
+  borraba del periodo aportaciones que sí se hicieron. Mismo criterio que el renglón de una meta en
+  Presupuesto (RN-151). La redacción original, que incluía `retiro_meta`, queda abajo como registro.
 - RN-259: Savings = Σ con signo invertido de `transactions.monto` con `tipo` en `aportacion_meta` o
   `retiro_meta`, dentro del rango del periodo seleccionado (aportaciones suman, retiros restan) —
   incluye movimientos de metas archivadas si el movimiento cayó dentro del periodo.
@@ -1685,6 +1686,7 @@ No introduce colección nueva — consulta agregada sobre `transactions` y `cate
 
 | Fecha | Cambio | CU afectado | Impacto en otros documentos |
 |---|---|---|---|
+| 2026-10-04 | Cambio cruzado desde [[ahorros-y-metas]] (RN-358): la card Savings deja de restar los retiros de meta y cuenta solo las aportaciones del periodo — se revisa RN-259. Mide cuánto se apartó, no el neto: un retiro suele ser temporal y restarlo borraba aportaciones que sí ocurrieron. No se acuñan códigos nuevos en este documento. | CU-069 | Ver [[ahorros-y-metas]] para el detalle; mismo criterio que RN-151 en [[presupuesto]] |
 | 2026-10-01 | La gráfica de balance mensual pasa a respetar `excluir_de_stats`, que hasta ahora ignoraba: una cuenta excluida ya no aporta bloque ni monto (RN-353, revisa RN-229). El síntoma era que el total de un mes no cuadraba con el balance total de la misma pantalla, que sí descuenta las excluidas desde RN-225. Las cards no cambian — ahí las excluidas se siguen mostrando con su badge (RN-226). Ambas gráficas de barras apiladas ganan el total de cada mes bajo la etiqueta del mes, abreviado, y su tooltip pasa a mostrar los montos con signo de moneda y dos decimales (RN-354). Sin cambios de esquema. | CU-062, CU-064 | [[data-model-registry]] actualiza el índice hasta RN-354 |
 | 2026-10-01 | El porcentaje de utilización de la card de tarjeta pasa a mostrarse sin decimales, y la barra que lo acompaña se colorea por nivel de uso con un token de rojo propio para indicadores en riesgo (RN-352, revisa RN-234). Es la primera excepción explícita al formato de porcentajes de toda la plataforma, acotada a este indicador. En la misma revisión, el badge "Excluded" de las cards de débito/efectivo (CU-061) pasa a posición absoluta: como hermano de la columna de nombre y saldo los empujaba unos píxeles hacia abajo, y una cuenta con badge quedaba desalineada frente a las demás del carrusel — es el mismo criterio de RN-237, que una card mida igual tenga o no el dato opcional. Sin cambios de esquema. | CU-061, CU-063 | [[data-model-registry]] actualiza el índice hasta RN-352 |
 | 2026-10-01 | La gráfica de uso mensual por tarjeta pasa a agrupar por el mes en que **cierra** el periodo de facturación, no por mes natural (RN-350, revisa RN-239) — la misma corrección que RN-236 ya había hecho para el indicador de ciclo y que RN-083 de [[reportes]] arrastraba. Se agrega junto a "Total credit cards" un indicador de lo que toca **pagar**, con desglose por tarjeta al posar el cursor (RN-351); su mes avanza solo conforme se liquidan las tarjetas, sin marcar nada a mano. Ese segundo bloque le da por fin presentación al cálculo del ciclo en curso de RN-237, que llevaba desde el 2026-09-06 calculándose sin mostrarse. Sin cambios de esquema. | CU-063, CU-064 | Comparte el vocabulario de ciclo con [[msi]] (RN-348, RN-349); [[data-model-registry]] actualiza el índice hasta RN-351 |

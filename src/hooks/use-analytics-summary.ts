@@ -51,7 +51,8 @@ export function useAnalyticsSummary(periodo: Period, customRange?: { fechaInicio
     let query = supabase
       .from('transactions')
       .select('category_id, monto, tipo, fecha')
-      .in('tipo', ['ingreso', 'gasto', 'aportacion_meta', 'retiro_meta'])
+      // `retiro_meta` queda fuera a propósito (RN-358): ver la nota de Savings más abajo.
+      .in('tipo', ['ingreso', 'gasto', 'aportacion_meta'])
     if (previous) query = query.gte('fecha', formatDateParam(previous.from))
     else if (current) query = query.gte('fecha', formatDateParam(current.from))
     if (current) query = query.lte('fecha', formatDateParam(current.to))
@@ -86,8 +87,14 @@ export function useAnalyticsSummary(periodo: Period, customRange?: { fechaInicio
       const esAnterior = inPreviousRange(row.fecha)
       if (!esActual && !esAnterior) continue
 
-      if (row.tipo === 'aportacion_meta' || row.tipo === 'retiro_meta') {
-        // RN-259: signo invertido — aportación (monto negativo) suma, retiro (positivo) resta.
+      if (row.tipo === 'aportacion_meta') {
+        // RN-259 (revisada 2026-10-04, ver RN-358): solo aportaciones, con signo invertido — el
+        // monto de una aportación es negativo porque el dinero sale de la cuenta.
+        //
+        // Los retiros **no** restan. Esta card mide cuánto se apartó para ahorro en el periodo, no
+        // el neto del ahorro: sacar dinero de una meta suele ser temporal —prestarlo y reponerlo
+        // después— y restarlo borraba del periodo aportaciones que sí se hicieron. Un mes con
+        // $10,000 retirados y $2,000 aportados muestra $2,000, no −$8,000.
         if (esActual) savingsActual += -row.monto
         if (esAnterior) savingsAnterior += -row.monto
         continue
