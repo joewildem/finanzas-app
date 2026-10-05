@@ -1345,6 +1345,10 @@ una con un indicador de crecimiento o caída respecto al periodo anterior equiva
 - RN-258: Expenses = Σ `abs(transactions.monto)` con `tipo = gasto` cuya categoría pertenece a un
   grupo con `flujo = outflow`, dentro del rango del periodo seleccionado. Los grupos con
   `flujo = investment` quedan fuera — tienen su propia card (RN-260), sin traslape.
+- RN-259 (_nota agregada 2026-10-04_): aquí los retiros **sí** restan, a diferencia del renglón de
+  una meta en Presupuesto, que desde RN-358 de [[ahorros-y-metas]] solo cuenta aportaciones. Esta
+  card mide cuánto se ahorró en el periodo —un neto— y aquella mide cumplimiento de un plan; el
+  mismo retiro aparece en una y no en la otra a propósito.
 - RN-259: Savings = Σ con signo invertido de `transactions.monto` con `tipo` en `aportacion_meta` o
   `retiro_meta`, dentro del rango del periodo seleccionado (aportaciones suman, retiros restan) —
   incluye movimientos de metas archivadas si el movimiento cayó dentro del periodo.

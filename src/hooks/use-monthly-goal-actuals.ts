@@ -3,10 +3,16 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { monthRange } from '@/lib/budgets'
 
-// RN-151 — "real" mensual de una meta: suma **con signo invertido** de sus transacciones
-// (aportacion_meta, retiro_meta) del mes — a diferencia de `useMonthlyActuals` (que usa
-// Math.abs, ya que ahí solo existen gastos negativos e ingresos positivos), aquí un retiro debe
-// restar del "real" del mes, no sumar, así que se conserva el signo invertido en vez de abs().
+// RN-151 (revisada 2026-10-04, ver RN-358) — "real" mensual de una meta en Presupuesto: suma con
+// signo invertido de sus **aportaciones** del mes. Los retiros **no** participan.
+//
+// Antes se incluía `retiro_meta` y un retiro restaba del "real". El renglón de una meta en
+// Presupuesto responde "cuánto de lo que planeé aportar llevo aportado", y un retiro no es una
+// aportación negativa: es dinero que sale del ahorro por una razón ajena al plan del mes —una
+// emergencia, típicamente— y restarlo hacía que el renglón reportara un avance negativo contra un
+// plan que sí se había cumplido. El efecto del retiro sobre el ahorro ya se ve donde corresponde:
+// en el saldo de la meta y en la card Savings de Analytics (RN-259), que sí mide el neto.
+//
 // Calculado al vuelo, nunca persistido — mismo patrón que `useMonthlyActuals`.
 export function useMonthlyGoalActuals(mes: string) {
   const [state, setState] = useState<{ mes: string; actuals: Record<string, number> | undefined }>(() => ({
@@ -23,10 +29,10 @@ export function useMonthlyGoalActuals(mes: string) {
     const { from, toExclusive } = monthRange(mes)
     const { data, error } = await supabase
       .from('transactions')
-      .select('meta_id, monto, tipo')
+      .select('meta_id, monto')
       .gte('fecha', from)
       .lt('fecha', toExclusive)
-      .in('tipo', ['aportacion_meta', 'retiro_meta'])
+      .eq('tipo', 'aportacion_meta')
 
     if (error) {
       setError(error.message)

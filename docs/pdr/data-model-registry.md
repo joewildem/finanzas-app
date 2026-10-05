@@ -19,7 +19,7 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 |Contador|Último usado|Módulo de origen|
 |---|---|---|
 |Casos de uso (CU-XXX)|CU-085|transacciones|
-|Reglas de negocio (RN-XXX)|RN-357|transacciones|
+|Reglas de negocio (RN-XXX)|RN-358|ahorros-y-metas|
 |Errores de validación (VALIDATION_XXX)|VALIDATION_041|suscripciones|
 |Errores de autenticación/autorización (AUTH_XXX)|AUTH_003|auth|
 |Errores de lógica de negocio (BIZ_XXX)|BIZ_036|suscripciones|
@@ -848,6 +848,7 @@ _(ninguno por ahora. Si un módulo nuevo contradice una definición previa de un
 |2026-10-01|dashboard|El porcentaje de utilización de la card de tarjeta de crédito se muestra sin decimales y su barra se colorea por nivel de uso —marca, ámbar y rojo en 40% y 80%— con un token nuevo `--color-alert` para indicadores en riesgo, distinto de `--destructive` (RN-352, revisa RN-234). Primera excepción explícita al formato de porcentajes de la plataforma, acotada a ese indicador. El badge "Excluded" de las cards de débito/efectivo pasa a posición absoluta para que toda card mida igual. **Sin cambios de esquema.** Índice de numeración hasta RN-352.|
 |2026-10-01|dashboard|La gráfica de balance mensual respeta `excluir_de_stats`, igual que el balance total de RN-225 (RN-353, revisa RN-229); las cards siguen mostrando las cuentas excluidas con su badge (RN-226), que es una lectura distinta. Las gráficas de barras apiladas muestran el total de cada mes en el eje horizontal, abreviado, y sus tooltips los montos a dos decimales con signo de moneda (RN-354). **Sin cambios de esquema.** Índice de numeración hasta RN-354.|
 |2026-10-01|transacciones|Un ajuste de saldo se registra desde el alta de movimientos, con monto y fecha propios y sin categoría (CU-085, RN-355). Resuelto con el tipo `ajuste` que ya existía y no con un campo `excluida` sobre un gasto: la exclusión de categorías ya es estructural porque las agregaciones filtran `tipo in ('gasto','ingreso')`, mismo criterio que `compra_msi`. Se unifica la convención de signo de `monto` de los ajustes de tarjeta de crédito, única excepción que quedaba en la tabla (RN-356), y un ajuste pasa a ser editable y eliminable, derogando BIZ_015 (RN-357). **Sin cambios de esquema** — `category_id` ya era nullable y `tipo` ya contemplaba `ajuste`. Índice de numeración hasta CU-085 / RN-357.|
+|2026-10-04|ahorros-y-metas, presupuesto|Un retiro de meta deja de restar del "real" de esa meta en Presupuesto (RN-358, revisa RN-151): el renglón cuenta solo las aportaciones del mes, porque mide cumplimiento de un plan y no el neto ahorrado. La card Savings de Analytics conserva el neto (RN-259 de [[dashboard]], con nota aclaratoria) — dos preguntas distintas sobre el mismo movimiento, deliberadamente. **Sin cambios de esquema.** Índice de numeración hasta RN-358.|
 
 ---
 
