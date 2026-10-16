@@ -18,8 +18,8 @@ Consultar y actualizar esta tabla antes de iniciar un módulo nuevo — evita co
 
 |Contador|Último usado|Módulo de origen|
 |---|---|---|
-|Casos de uso (CU-XXX)|CU-085|transacciones|
-|Reglas de negocio (RN-XXX)|RN-359|msi|
+|Casos de uso (CU-XXX)|CU-086|creditos-deudas|
+|Reglas de negocio (RN-XXX)|RN-360|creditos-deudas|
 |Errores de validación (VALIDATION_XXX)|VALIDATION_041|suscripciones|
 |Errores de autenticación/autorización (AUTH_XXX)|AUTH_003|auth|
 |Errores de lógica de negocio (BIZ_XXX)|BIZ_036|suscripciones|
@@ -850,6 +850,7 @@ _(ninguno por ahora. Si un módulo nuevo contradice una definición previa de un
 |2026-10-01|transacciones|Un ajuste de saldo se registra desde el alta de movimientos, con monto y fecha propios y sin categoría (CU-085, RN-355). Resuelto con el tipo `ajuste` que ya existía y no con un campo `excluida` sobre un gasto: la exclusión de categorías ya es estructural porque las agregaciones filtran `tipo in ('gasto','ingreso')`, mismo criterio que `compra_msi`. Se unifica la convención de signo de `monto` de los ajustes de tarjeta de crédito, única excepción que quedaba en la tabla (RN-356), y un ajuste pasa a ser editable y eliminable, derogando BIZ_015 (RN-357). **Sin cambios de esquema** — `category_id` ya era nullable y `tipo` ya contemplaba `ajuste`. Índice de numeración hasta CU-085 / RN-357.|
 |2026-10-04|ahorros-y-metas, presupuesto, dashboard|Ninguna medición de ahorro por periodo resta los retiros de meta (RN-358, revisa RN-151 y RN-259): el "real" del renglón de una meta en Presupuesto cuenta solo las aportaciones del mes, porque mide cumplimiento de un plan y no el neto ahorrado. La card Savings de Analytics sigue el mismo criterio (RN-259 revisada): mide cuánto se apartó en el periodo, no el neto, porque un retiro suele ser temporal — prestar dinero de una meta y reponerlo después no significa que el ahorro del periodo no haya ocurrido. El neto sigue disponible en el saldo de la meta y en su historial, vía `savings_goal_movements`. **Sin cambios de esquema.** Índice de numeración hasta RN-358.|
 |2026-10-04|msi|Los planes a meses de una tarjeta archivada dejan de aparecer en toda vista que agregue varias tarjetas —Presupuesto, dinero por repartir e indicador de pago del Dashboard— y siguen visibles en el detalle de su propia cuenta (RN-359). Surgió de archivar tarjetas renombradas a "… Deprecated" para recrearlas con el nombre original, lo que duplicaba cada renglón de Presupuesto. **Sin cambios de esquema.** Índice de numeración hasta RN-359.|
+|2026-10-16|creditos-deudas|Nueva colección `debt_adjustments` (pago a deuda registrado sin cuenta) y nueva vista `debt_movements`, que unifica pagos con y sin cuenta y pasa a ser la única definición del saldo de una deuda (CU-086, RN-360; revisa RN-202 y RN-221). Mismo patrón que `savings_goal_adjustments`/`savings_goal_movements`: `transactions.account_id` sigue siendo `not null` y no se toca. Índice `debt_adjustments_deuda_fecha_idx` sobre `(deuda_id, fecha desc)`. RLS: select y delete propios; la escritura solo por `create_debt_adjustment`. En la misma migración se corrige `update_transaction`, que desde el 2026-10-01 referenciaba la columna inexistente `monto_total` y hacía fallar la edición de un pago a deuda. Índice de numeración hasta CU-086 / RN-360.|
 
 ---
 

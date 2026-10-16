@@ -72,20 +72,26 @@ export function DebtPaymentDialog({
       setSubmitError('VALIDATION_035')
       return
     }
-    if (!accountId) {
-      setSubmitError('VALIDATION_001')
-      return
-    }
-
     setIsSubmitting(true)
-    const { error } = await supabase.rpc('create_debt_payment', {
-      p_deuda_id: debt.id,
-      p_account_id: accountId,
-      p_monto_capital: principal,
-      p_monto_interes: interest,
-      p_fecha: format(fecha, 'yyyy-MM-dd'),
-      p_nota: nota || null,
-    })
+    // Sin cuenta se va por otro camino (RN-360): `create_debt_adjustment` registra el pago contra
+    // la deuda y no toca ningún saldo de cuenta. No es el mismo RPC con un parámetro nulo porque
+    // tampoco es la misma fila — vive en `debt_adjustments`, fuera de `transactions`.
+    const { error } = accountId
+      ? await supabase.rpc('create_debt_payment', {
+          p_deuda_id: debt.id,
+          p_account_id: accountId,
+          p_monto_capital: principal,
+          p_monto_interes: interest,
+          p_fecha: format(fecha, 'yyyy-MM-dd'),
+          p_nota: nota || null,
+        })
+      : await supabase.rpc('create_debt_adjustment', {
+          p_deuda_id: debt.id,
+          p_monto_capital: principal,
+          p_monto_interes: interest,
+          p_fecha: format(fecha, 'yyyy-MM-dd'),
+          p_nota: nota || null,
+        })
     setIsSubmitting(false)
     if (error) {
       setSubmitError(findTransactionErrorCodeInMessage(error.message) ?? 'SYS_001')
@@ -115,6 +121,12 @@ export function DebtPaymentDialog({
           </div>
 
           <AccountPickerRow label="From" accounts={eligibleAccounts} accountId={accountId} onSelect={setAccountId} />
+          {!accountId && (
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Optional. Leave it empty for a payment you already made — it lowers the debt without
+              touching any account balance.
+            </p>
+          )}
 
           <DatePickerRow value={fecha} onChange={setFecha} />
 

@@ -139,8 +139,11 @@ export function DebtDetailPage() {
               {payments.map((payment) => (
                 <div key={payment.id} className="flex items-center justify-between py-3">
                   <div>
+                    {/* Un pago registrado sin cuenta (RN-360) no tiene de dónde sacar un nombre, y
+                        "Unknown account" mentiría: no es que se desconozca, es que no hubo cuenta
+                        que mover porque el dinero ya había salido cuando se capturó. */}
                     <p className="text-sm text-card-foreground">
-                      {payment.account?.nombre ?? 'Unknown account'}
+                      {payment.account_nombre ?? 'No account'}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {formatDate(payment.fecha)} · Principal{' '}

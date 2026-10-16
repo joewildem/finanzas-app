@@ -51,7 +51,9 @@ export function useNetworthBreakdown() {
     const [goalMovementsRes, debtPaymentsRes] = await Promise.all([
       // RN-335: el saldo de una meta incluye sus ajustes (rendimientos), que no viven en `transactions`.
       supabase.from('savings_goal_movements').select('meta_id, monto'),
-      supabase.from('transactions').select('deuda_id, monto_capital').eq('tipo', 'pago_deuda'),
+      // RN-360: el saldo de una deuda incluye los pagos registrados sin cuenta, que no viven en
+      // `transactions` — mismo patrón que `savings_goal_movements` arriba.
+      supabase.from('debt_movements').select('deuda_id, monto_capital'),
     ])
     if (goalMovementsRes.error || debtPaymentsRes.error) {
       setError((goalMovementsRes.error ?? debtPaymentsRes.error)!.message)

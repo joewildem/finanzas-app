@@ -271,9 +271,11 @@ pestañas: "Activas" (`status = active`) y "Liquidadas" (`status = archived`).
 
 **Reglas de negocio**
 
-- RN-202: `saldo_actual` se calcula en tiempo de consulta como `monto_original` menos la suma de
-  `monto_capital` de todas las transacciones `pago_deuda` ligadas a esta deuda mediante `deuda_id` —
-  nunca se persiste, mismo patrón que `monto_aportado_actual` en [[ahorros-y-metas]].
+- RN-202 (_revisada 2026-10-16, ver RN-360_): `saldo_actual` se calcula en tiempo de consulta como
+  `monto_original` menos la suma de `monto_capital` de todo lo que mueve la deuda, leído de la vista
+  `debt_movements` — pagos con cuenta (`transactions.tipo = pago_deuda`) y pagos registrados sin
+  cuenta (`debt_adjustments`). Antes se leía `transactions` directo. Nunca se persiste, mismo patrón
+  que `monto_aportado_actual` en [[ahorros-y-metas]].
 - RN-203: `porcentaje_pagado = (monto_original − saldo_actual) ÷ monto_original`; se muestra como 0%
   si aún no hay pagos registrados.
 - RN-204: si `saldo_actual` llega a $0 o menos, la deuda permanece en `status = active` — el
@@ -911,9 +913,12 @@ una reducción de lo adeudado.
 - RN-219: la deuda debe estar en `status = active` para recibir nuevos pagos.
 - RN-220: el `concepto` se genera automáticamente como "Pago a deuda: {nombre de la deuda}" — no es
   capturado por el usuario.
-- RN-221: `monto_capital` no puede ser mayor al saldo actual de la deuda al momento del pago — evita
-  que una deuda quede con un saldo calculado negativo, mismo criterio que RN-146 de
-  [[ahorros-y-metas]] para un retiro de meta.
+- RN-221 (_revisada 2026-10-16, ver RN-360_): `monto_capital` no puede ser mayor al saldo actual de
+  la deuda al momento del pago — evita que una deuda quede con un saldo calculado negativo, mismo
+  criterio que RN-146 de [[ahorros-y-metas]] para un retiro de meta. El saldo contra el que se valida
+  sale de `debt_movements`, así que incluye los pagos registrados sin cuenta.
+- RN-222 (_nota 2026-10-16_): la cuenta de origen **dejó de ser obligatoria**; ver CU-086. Cuando se
+  captura, las reglas de RN-218 siguen aplicando sin cambio.
 
 **Casos de uso derivados identificados**
 
@@ -1081,10 +1086,124 @@ Se registran en el cierre de este módulo: la nueva tabla `debts`, la extensión
 `budgets` (`deuda_id`), sus índices, nuevas relaciones, el diagrama ER actualizado, y el índice de
 numeración.
 
+### CU-086 — Registrar un pago a deuda sin cuenta
+
+**Actor:** Usuario autenticado (dueño de los datos)
+
+**Descripción del caso de uso**
+
+Esta funcionalidad permite registrar un pago que el usuario **ya hizo** y olvidó capturar en su
+momento. Capturarlo como un pago normal con fecha pasada no sirve: `create_debt_payment` descuenta
+el monto del `saldo_actual` de la cuenta de origen, y ese saldo ya refleja la salida desde hace
+semanas. La deuda quedaría bien y la cuenta mal.
+
+Por eso la cuenta deja de ser obligatoria en el alta de un pago (CU-060). Dejarla vacía registra el
+pago **contra la deuda y nada más**: baja el saldo de la deuda y aparece en su historial, sin tocar
+ninguna cuenta.
+
+**Flujo principal**
+
+1. El usuario abre "Register payment" desde la deuda.
+2. Captura monto total, interés y fecha, y **deja el selector de cuenta vacío**.
+3. El sistema valida el capital contra el saldo vigente de la deuda (RN-221), incluyendo los pagos
+   previos registrados por esta misma vía.
+4. El sistema registra una fila en `debt_adjustments` y **no** modifica ningún `saldo_actual`.
+
+**Flujos alternativos / casos borde**
+
+- Con cuenta seleccionada, el comportamiento es el de siempre (CU-060): fila en `transactions` y
+  descuento del saldo de la cuenta.
+- Si el capital excede el saldo vigente, se rechaza con `BIZ_033`, igual que un pago normal.
+- Un pago registrado sin cuenta **se elimina** desde su historial; no se edita. No hay saldo de
+  cuenta que revertir, así que borrar y volver a capturar es equivalente a editar.
+
+**Precondiciones**
+
+- El usuario debe estar autenticado y la deuda debe estar activa.
+
+**Postcondiciones**
+
+- Existe una fila en `debt_adjustments`; el saldo de la deuda baja por su `monto_capital`.
+- Ningún `accounts.saldo_actual` cambia.
+
+**Reglas de negocio**
+
+- RN-360 (agregada 2026-10-16): un pago a deuda registrado **sin cuenta** vive en `debt_adjustments`,
+  no en `transactions`. Toda fila de `transactions` mueve exactamente una cuenta
+  (`account_id not null`) y de eso dependen los RPC de editar y eliminar, los historiales de cuenta y
+  la reconstrucción de saldos "a la fecha"; volver nullable esa columna obligaría a que cada una de
+  esas consultas recordara el caso. **No volverla nullable para meter esto ahí** — mismo criterio y
+  misma estructura que `savings_goal_adjustments` (CU-084 de [[ahorros-y-metas]]).
+
+  La consecuencia es la que el usuario pidió: cuenta **solo en la deuda**. Queda fuera del listado
+  de Transacciones, de los historiales de cuenta, del "real" de Presupuesto (RN-223) y de Analytics
+  por construcción, no por un filtro que alguien tenga que acordarse de poner. Que no entre en
+  Presupuesto es deliberado: ese dinero se gastó en su mes y contarlo en el mes en que se captura
+  inflaría un presupuesto que ya se cerró.
+
+  Todo cálculo del saldo de una deuda se lee de la vista `debt_movements` —pagos con cuenta y sin
+  ella—, de modo que pantalla y servidor no puedan discrepar sobre cuánto se debe. Eso incluye la
+  validación de RN-221: sin la vista, dos pagos sin cuenta podrían sobrepasar el saldo entre ambos
+  sin que ninguna validación lo notara.
+
+**Validaciones**
+
+| Campo | Tipo | Reglas | Mitigación OWASP |
+|---|---|---|---|
+| `p_deuda_id` | uuid | Requerido; deuda propia y activa | A01 — Verificar pertenencia al usuario |
+| `p_monto_capital` | numeric(14,2) | Requerido; ≥ 0; no mayor al saldo vigente | A03 — Validar tipo y rango |
+| `p_monto_interes` | numeric(14,2) | Requerido; ≥ 0 | A03 — Validar tipo y rango |
+| `p_fecha` | date | Opcional; si falta, `public.today_local()` | A03 — Validar formato |
+| `p_nota` | text | Opcional | A03 — Escapar al renderizar |
+
+**Mensajes de error**
+
+*Validación*
+- `VALIDATION_006`: "Los montos deben ser válidos." *(reutilizado)*
+- `VALIDATION_012`: "El monto debe ser mayor a cero." *(reutilizado)*
+
+*Lógica de negocio*
+- `BIZ_031`: "La deuda no existe o no está activa." *(reutilizado)*
+- `BIZ_033`: "El capital no puede ser mayor al saldo de la deuda." *(reutilizado)*
+
+*Autenticación / autorización*
+- `AUTH_001`: "Tu sesión ha expirado. Inicia sesión nuevamente." *(reutilizado)*
+
+**Requerimientos técnicos backend**
+
+*Definición del servicio*
+
+| Método | Endpoint | Auth |
+|---|---|---|
+| POST | `/rest/v1/rpc/create_debt_adjustment` | Bearer JWT |
+
+*Modelo de información*
+
+Introduce la colección `debt_adjustments` y la vista `debt_movements`. Ver [[data-model-registry]].
+
+**Matriz de pruebas**
+
+| # | Categoría | Escenario | Input | Resultado esperado | HTTP |
+|---|---|---|---|---|---|
+| 1 | Flujo exitoso | Pago sin cuenta con fecha pasada | capital 3000, interés 250 | El saldo de la deuda baja 3000; **ningún** saldo de cuenta cambia | 200 |
+| 2 | Lógica de negocio | El pago no es una transacción | — | No aparece en `transactions`, ni en el listado de Transacciones, ni en Presupuesto, ni en Analytics | 200 |
+| 3 | Lógica de negocio | Pago normal posterior | — | Ve el saldo ya reducido por el pago sin cuenta y descuenta su cuenta con normalidad | 200 |
+| 4 | Lógica de negocio | Capital mayor al saldo vigente | — | `BIZ_033`, contando los pagos sin cuenta ya registrados | 409 |
+| 5 | Lógica de negocio | Eliminar un pago sin cuenta | — | El saldo de la deuda vuelve al valor previo | 200 |
+| 6 | Validación de entrada | Capital e interés en cero | `0`, `0` | `VALIDATION_012` | 400 |
+| 7 | Autenticación / autorización | Token expirado o ausente | Sin JWT válido | `AUTH_001` | 401 |
+
+**Referencia de diseño**
+
+- Pantalla / flujo: modal "Register payment" de una deuda, con el selector de cuenta opcional.
+
+---
+
 ## Historial de cambios
 
 |Fecha|Cambio|CU afectado|Impacto en otros documentos|
 |---|---|---|---|
+|2026-10-16|La cuenta de origen deja de ser obligatoria al registrar un pago (CU-086, RN-360): dejarla vacía registra el pago contra la deuda sin tocar ningún saldo de cuenta. Surgió de capturar un pago ya hecho y olvidado — con cuenta, el sistema volvía a descontarlo de un saldo que ya lo reflejaba. Vive en la nueva tabla `debt_adjustments` y **no** en `transactions`, por la misma razón que `savings_goal_adjustments` (CU-084): `account_id` es `not null` y de eso dependen los RPC de editar y eliminar, los historiales de cuenta y la reconstrucción de saldos. Todo cálculo del saldo pasa a la vista `debt_movements`, incluida la validación de RN-221; se revisan RN-202 y RN-221. **En la misma migración se corrige un error vivo desde el 2026-10-01**: `update_transaction` referenciaba `v_deuda.monto_total`, columna que no existe en `debts` (es `monto_original`), así que **editar un pago a deuda fallaba** con SYS_001. plpgsql resuelve el acceso a campos de registro en tiempo de ejecución, por eso la función se creó sin error y solo fallaba al ejecutar esa rama.|CU-060, CU-086, CU-017 (de [[transacciones]])|Se actualiza [[data-model-registry]] con `debt_adjustments`, la vista `debt_movements`, su índice y el índice de numeración hasta CU-086 / RN-360|
 |2026-08-24|Se crea el módulo Créditos y Deudas: tabla `debts` (deuda externa con nombre, tipo, monto original, tasa de interés, pago mensual esperado, día de pago y fecha estimada de liquidación opcional); se introduce el tipo `pago_deuda` en `transactions` como documento único vía el nuevo campo `deuda_id`, con el pago dividido en `monto_capital`/`monto_interes` — el saldo de la deuda solo baja por capital, nunca por interés. Se agregan CU-055 a CU-060. Cada deuda activa gana su propio renglón presupuestable en [[presupuesto]] (`budgets.deuda_id`), igual que cada meta de ahorro. El archivado es siempre manual, sin relación con que el saldo llegue a $0. Con este documento se completan los 9 documentos de `docs/pdr/`, cerrando la fase de Casos de uso y Requerimientos del alcance completo.|CU-055 a CU-060|Se actualiza [[data-model-registry]] con la tabla `debts`, la extensión de `transactions` y `budgets`, nuevas relaciones, diagrama ER e índice de numeración. Se modifica [[presupuesto]]: se agrega `budgets.deuda_id`, un renglón presupuestable por deuda activa, y se revisa `RN-075` (Total por asignar). Se modifica [[transacciones]]: se agrega `pago_deuda` al enum `tipo`, se agregan `deuda_id`/`monto_capital`/`monto_interes`, y CU-017 gana los tres como campos editables.|
 |2026-09-05|Ajuste visual sobre el módulo ya construido, sin cambios de esquema ni de reglas de cálculo: la card del listado pasa a mostrar la fecha estimada de liquidación como pill en su renglón de cierre, con una altura mínima fija en ese renglón (RN-293). Replica el ajuste equivalente de la card de metas (RN-290 de [[ahorros-y-metas]]), hecho el mismo día por la misma razón — la pill en un renglón propio desigualaba la altura de las cards dentro de una fila del grid.|CU-056|Se actualiza [[data-model-registry]]: índice de numeración hasta RN-293.|
 

@@ -26,10 +26,9 @@ export function DebtsListPage() {
 
   useEffect(() => {
     async function loadPayments() {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('deuda_id, monto_capital')
-        .eq('tipo', 'pago_deuda')
+      // RN-360: desde `debt_movements` y no de `transactions`, para que los pagos registrados sin
+      // cuenta cuenten en el saldo igual que los demás.
+      const { data, error } = await supabase.from('debt_movements').select('deuda_id, monto_capital')
 
       if (error) return
       const grouped: Record<string, number[]> = {}

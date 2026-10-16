@@ -2,10 +2,23 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { supabase } from '@/lib/supabase'
 import type { Debt } from '@/lib/debts'
-import type { Transaction } from '@/lib/transactions'
 
-export interface DebtPayment extends Transaction {
-  account: { nombre: string; color: string } | null
+// Una fila de `debt_movements`: un pago normal (`pago_deuda`, con su cuenta) o uno registrado sin
+// cuenta (`pago_sin_cuenta`, RN-360). El historial los muestra juntos porque ambos son pagos a esta
+// deuda; lo único que cambia es si hubo cuenta que mover.
+export interface DebtPayment {
+  id: string
+  user_id: string
+  deuda_id: string
+  origen: 'pago_deuda' | 'pago_sin_cuenta'
+  account_id: string | null
+  account_nombre: string | null
+  monto_capital: number
+  monto_interes: number
+  monto: number
+  fecha: string
+  nota: string | null
+  created_at: string
 }
 
 // CU-057 — detalle + historial de pagos de una deuda. Una deuda inexistente o de otro usuario
@@ -21,8 +34,8 @@ export function useDebt(debtId: string | undefined) {
     const [debtResult, paymentsResult] = await Promise.all([
       supabase.from('debts').select('*').eq('id', debtId).maybeSingle(),
       supabase
-        .from('transactions')
-        .select('*, account:accounts(nombre,color)')
+        .from('debt_movements')
+        .select('*')
         .eq('deuda_id', debtId)
         .order('fecha', { ascending: false })
         // La fecha ya no lleva hora: sin desempate, dos movimientos del mismo día salían en orden
